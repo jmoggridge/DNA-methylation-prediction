@@ -1,13 +1,14 @@
 
+
 import re
 import numpy as np
 import pandas as pd
 import seaborn as sns
-import random
+# import random
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.preprocessing import LabelEncoder, OneHotEncoder
-from sklearn.model_selection import StratifiedKFold, StratifiedShuffleSplit
-from sklearn.ensemble import RandomForestClassifier
+# from sklearn.model_selection import StratifiedKFold, StratifiedShuffleSplit
+# from sklearn.ensemble import RandomForestClassifier
 
 
 ### FEATURE ENGINEERING FUNCTIONS
@@ -119,7 +120,18 @@ def make_one_hot_seq(df):
 
     return(X1)
 
+
+def make_all_features(df):
+  """wrapper for all the above feature-generating functions"""
+    return(pd.concat([make_relative_positions(df.copy()),
+                      make_dummies(df.copy()), 
+                      make_kmer_freq(df.copy()), 
+                      make_one_hot_seq(df.copy())], 
+                     1)
+          )
   
+  
+
 
 ### MAIN
   
@@ -145,15 +157,46 @@ for col in ["fwd_seq", "seq", "refgene"]:
 train['position'] = train['position'].astype('float64')
 del(col)
 
+train = train.drop(['id', 'chromosome', 'outcome'], 1)
+
 Y = train['outcome']
-df = train.drop(['id', 'chromosome', 'outcome'], 1)
+Y.to_csv("data/train_Y.csv")
 
+# make_dummies(train)
+# make_kmer_freq(train)
+# make_relative_positions(train)
+# make_one_hot_seq(train)
 
+X = make_all_features(train)
+X.to_csv("data/train_X.csv")
 
-# split into folds/
-k_folds = StratifiedKFold(n_splits=10)
-k_folds
+## Same thing for test data
+test = pd.read_csv('data/test.csv')
+test = test.rename(columns={"Id": "id",
+                              "CHR": "chromosome", 
+                              "MAPINFO": "position",
+                              "UCSC_CpG_Islands_Name": "island",  
+                              "UCSC_RefGene_Group":"refgene",
+                              "Relation_to_UCSC_CpG_Island": "rel_to_island",
+                              "Regulatory_Feature_Group": "feature",
+                              "Forward_Sequence":"fwd_seq"})
 
-# 
+# change categorical variables dtypes
+test['position'] = test['position'].astype('float64')
+test["rel_to_island"] = test["rel_to_island"].astype("category")
+for col in ["fwd_seq", "seq", "refgene"]:
+    test[col] = test[col].astype("string")
+del(col)
+
+# drop unneeded data
+test = test.drop(['id', 'chromosome'], 1)
+
+# make_dummies(test)
+# make_kmer_freq(test)
+# make_relative_positions(test)
+# make_one_hot_seq(test)
+
+X_test = make_all_features(test)
+X_test.to_csv("data/test_X.csv")
 
 
