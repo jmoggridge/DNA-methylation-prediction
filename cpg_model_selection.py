@@ -14,7 +14,6 @@ from sklearn import metrics
 from sklearn.linear_model import LogisticRegression
 from sklearn.svm import SVC
 from sklearn.ensemble import RandomForestClassifier
-from sklearn.ensemble import GradientBoostingClassifier
 from xgboost import XGBClassifier
 
 # reporting
@@ -82,7 +81,13 @@ logreg_grid = {
     }
 
 # Setup the grid search
-logreg_model = RandomizedSearchCV(logreg_pipe, logreg_grid, n_jobs=-1, verbose=2, n_iter = 40, cv=10)
+logreg_model = RandomizedSearchCV(
+    logreg_pipe, 
+    logreg_grid, 
+    n_jobs=-1, 
+    verbose=2, 
+    n_iter = 40, 
+    cv=10)
 
 # Now actually do the tuning search by CV
 print('\n\n-----------------------------------')
@@ -141,14 +146,17 @@ svm_grid = {
     'svm__C': np.logspace(-2, 10, 13),
     'svm__gamma': np.logspace(-9, 3, 13)
     }
-svm_steps = [('scaler', StandardScaler()), ('pca', PCA()), ('svm', svm)]
-svm_pipe = Pipeline(steps = svm_steps)
+svm_pipe = Pipeline(steps = [
+    ('scaler', StandardScaler()), 
+    ('pca', PCA()), 
+    ('svm', svm)]
+    )
 svm_model = RandomizedSearchCV(svm_pipe, svm_grid, n_jobs=-1, verbose=2, n_iter = 10, cv=10)
 svm_model.fit(x_train, y_train)
 svm_cv_results = pd.DataFrame(logreg_model.cv_results_)
 svm_cv_results.to_csv("./svm_cv_results.csv")
 
-
+###
 
 #### EVERYTHING ABOVE HERE WORKS
 
@@ -161,20 +169,53 @@ rf = RandomForestClassifier(random_state = 22)
 rf_grid = {
     'pca__n_components': [5, 10, 20, 50, 100, 250],
     'rf__max_features': ['auto', 'sqrt'],
-    'rf__min_samples_leaf': [1, 2, 4, 8],
-    'rf__min_samples_split': [2, 5, 10],
-    'rf__n_estimators': [500, 1000, 2000],
+    'rf__min_samples_leaf': [10, 50, 100],
+    'rf__min_samples_split': [10],
+    'rf__n_estimators': [1000],
     'rf__bootstrap': [True, False]
     }
-rf_steps = [('scaler', StandardScaler()), ('pca', PCA()), ('rf', rf)]
-rf_pipe = Pipeline(steps = rf_steps)
-rf_model = RandomizedSearchCV(rf_pipe, rf_grid, n_jobs=-1, verbose=2, n_iter = 10, cv=10)
+rf_pipe = Pipeline(steps = [
+    ('scaler', StandardScaler()), 
+    ('pca', PCA()), 
+    ('rf', rf)]
+    )
+rf_model = RandomizedSearchCV(
+    rf_pipe, 
+    rf_grid,
+    n_iter = 10,
+    cv=10,
+    n_jobs=-1,
+    verbose=2
+    )
 rf_model.fit(x_train, y_train)
-rf_cv_results = pd.DataFrame(logreg_model.cv_results_)
-rf_cv_results.to_csv("./svm_cv_results.csv")
+
+rf_cv_results = pd.DataFrame(rf_model.cv_results_)
+rf_cv_results.to_csv("./rf_cv_results.csv")
+
+importances = rf_model.feature_importances_
+importances.to_csv("./rf_feature_importances.csv")
+
+indices = np.argsort(importances)
+plt.title('Feature Importances')
+plt.barh(range(len(indices)), importances[indices], color='b', align='center')
+plt.yticks(range(len(indices)), [features[i] for i in indices])
+plt.xlabel('Relative Importance')
+plt.show()
+
+# Save Models Using Pickle
+import pickle
+
+# save the models to disk
+
+pickle.dump(model, open('logreg_model.sav', 'wb'))
+pickle.dump(model, open('svm_model.sav', 'wb'))
+pickle.dump(model, open('rf_model.sav', 'wb'))
 
 
-
+# load the model from disk
+loaded_model = pickle.load(open(filename, 'rb'))
+result = loaded_model.score(X_test, Y_test)
+print(result)
 
 
 
