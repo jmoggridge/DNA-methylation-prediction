@@ -1,0 +1,48 @@
+---
+title: "DNA_methylation_ML_report"
+author: "J Moggridge"
+date: "28/03/2021"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Introduction
+
+DNA methylation is an epigenetic modification that impacts many processes and is involved in disease states..
+
+... Imprinting
+
+.... Measurement is noisy?
+
+Prediction of methylation status could be important for...
+
+The DNA methylation dataset used in this work is comprised of positional, categorical, and sequence information. As such, the data requires feature extraction to make use of the non-numeric information, particularly the sequence information. Nominal information include (1) the relation to any nearby CpG island (island, north/south shelf or shore, or none); (2) location relative to genes (TSS regions, UTRs, gene body, 1st exon); (3) associated regulatory features (gene/non-gene/promoter associations & cell-type specificity).
+
+The positional information include the location within the genome and the position of any nearby CpG islands. The training data is comprised entirely of sites on chromosomes 1-10 and the test data has sites from chromosomes 11-22. I extracted the distance to the nearest island (if one exist) and retained only this information, as the exact location information would be easy for ML models to memorize.
+
+Two popular approaches to DNA sequence processing are to use a 'bag-of-words' approach with k-mers, or to use one-hot encoding for each position. One-hot encoding the sequence has the advantage of retaining positional information whereas the kmer counts only retain compositional (or motif) information. There is 2 kbp of sequence centered around the CpG sites included in the dataset. I used a combinged approach, where I one-hot encoded the 60 bp upstream and downstream regions and counted kmers over the 2 kbp region.
+
+Use of dimensionality reduction might be appropriate when the number of such features gets very large.
+
+I sought to find out which model performs best on the problem of predicting DNA methylation status at CpG sites.
+
+## Methods
+
+### Data preparation
+
+The DNA methylation dataset used in this work is comprised of positional, categorical, and sequence information. As such, the data requires feature extraction to make use of the non-numeric information, particularly the sequence information. Nominal information include (1) the relation to any nearby CpG island (island, north/south shelf or shore, or none); (2) location relative to genes (TSS regions, UTRs, gene body, 1st exon); (3) associated regulatory features (gene/non-gene/promoter associations & cell-type specificity).
+
+The positional information include the location within the genome and the position of any nearby CpG islands. The training data is comprised entirely of sites on chromosomes 1-10 and the test data has sites from chromosomes 11-22. I extracted the distance to the nearest island (if one exist) and retained only this information, as the exact location information would be easy for ML models to memorize.
+
+Two popular approaches to DNA sequence processing are to use a 'bag-of-words' approach with k-mers, or to use one-hot encoding for each position. One-hot encoding the sequence has the advantage of retaining positional information whereas the kmer counts only retain compositional (or motif) information. There is 2 kbp of sequence centered around the CpG sites included in the dataset. I used a combinged approach, where I one-hot encoded the 60 bp upstream and downstream regions and counted kmers over the 2 kbp region.
+
+Use of dimensionality reduction might be appropriate when the number of such features gets very large.
+
+### Model selection
+
+I tuned model hyperparameters separately for each
+
+### Model evaluation

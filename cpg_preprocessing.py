@@ -20,7 +20,7 @@ def make_dummies(df):
         dfx[term] = dfx[term].fillna(0).astype('int32')
     
     # create 2 sets of dummies from 'feature ~ Regulatory_Feature_Group
-    df["cell_type_specific"] = df['feature'].str.count("_Cell_type_specific").fillna(0).astype('int32')
+    dfx["cell_type_specific"] = df['feature'].str.count("_Cell_type_specific").fillna(0).astype('int32')
     for term in ["Gene_Associated", "NonGene_Associated", "Promoter_Associated", "Unclassified"]:
         dfx[term] = dfx['feature'].str.count(term).fillna(0).astype('int32')
     
@@ -112,20 +112,27 @@ def make_one_hot_seq(df):
     return(X1)
 
 #
-def make_all_features(df):
-    return(pd.concat([make_relative_positions(df.copy()), 
-                      make_dummies(df.copy()), 
-                      make_kmer_freq(df.copy()), 
-                      make_one_hot_seq(df.copy())], 1))
+# def make_all_features(df):
+#     return(pd.concat([make_relative_positions(df.copy()), 
+#                       make_dummies(df.copy()), 
+#                       make_kmer_freq(df.copy()), 
+#                       make_one_hot_seq(df.copy())], 1))
+# 
 
 ## Main ######
 
 train = pd.read_csv('data/train.csv')
 
-# give the data names that don't suck
-train = train.rename(columns={"Id": "id", "CHR": "chromosome", "MAPINFO": "position", "UCSC_CpG_Islands_Name": "island",  
-                              "UCSC_RefGene_Group":"refgene", "Relation_to_UCSC_CpG_Island": "rel_to_island",
-                              "Regulatory_Feature_Group": "feature", "Forward_Sequence":"fwd_seq", "Beta": "outcome"})
+# give the variables shorter names
+train = train.rename(columns={"Id": "id", 
+                              "CHR": "chromosome", 
+                              "MAPINFO": "position", 
+                              "UCSC_CpG_Islands_Name": "island",  
+                              "UCSC_RefGene_Group":"refgene",
+                              "Relation_to_UCSC_CpG_Island": "rel_to_island",
+                              "Regulatory_Feature_Group": "feature", 
+                              "Forward_Sequence":"fwd_seq",
+                              "Beta": "outcome"})
 
 
 # change categorical variables dtypes
@@ -146,16 +153,38 @@ Y.to_csv('data/train_Y.csv')
 
 # drop unnecessary columns
 train = train.drop(['id', 'chromosome', 'outcome'], 1)
-train.info()
+print(train.info())
 
 # make all the features and save data
 print("Making training features ....")
-train_X = make_all_features(train)
+position = make_relative_positions(train.copy())
+print("Position df")
+print(position.info())
+
+dummies = make_dummies(train.copy())
+print("Dummies df")
+print(dummies.info())
+
+one_hot = make_one_hot_seq(train.copy())
+print("One hot 120bp sequence df")
+print(one_hot.info())
+
+kmers = make_kmer_freq(train.copy()) 
+print("kmers df before removing kmers with n's")
+print(kmers.shape)
+kmers = kmers.loc[:,~kmers.columns.str.contains('n', case=False)] 
+print("kmers df after removing kmers with n's")
+print(kmers.shape)
+kmers.info()
+
+train_X = pd.concat([position, dummies, one_hot, kmers], 1)
 print(train_X.info())
 
 print("Saving training features ....")
-train_X.to_csv("data/test_X.csv")
-del(train, train_X)
+train_X.to_csv("data/train_X.csv")
+
+# del(train, train_X)
+print("Done with training data")
 
 
 ####
@@ -163,9 +192,14 @@ del(train, train_X)
 ## Same thing for test data
 test = pd.read_csv('data/test.csv')
 
-test = test.rename(columns={"Id": "id", "CHR": "chromosome",  "MAPINFO": "position", "UCSC_CpG_Islands_Name": "island",  
-                            "UCSC_RefGene_Group":"refgene", "Relation_to_UCSC_CpG_Island": "rel_to_island",
-                            "Regulatory_Feature_Group": "feature", "Forward_Sequence":"fwd_seq"})
+test = test.rename(columns={"Id": "id", 
+                            "CHR": "chromosome", 
+                            "MAPINFO": "position",
+                            "UCSC_CpG_Islands_Name": "island",  
+                            "UCSC_RefGene_Group":"refgene",
+                            "Relation_to_UCSC_CpG_Island": "rel_to_island",
+                            "Regulatory_Feature_Group": "feature", 
+                            "Forward_Sequence":"fwd_seq"})
 
 # change categorical variables dtypes
 test['position'] = test['position'].astype('float64')
@@ -181,10 +215,33 @@ test = test.drop(['id', 'chromosome'], 1)
 
 # make features
 print("Making testing features ....")
-test_X = make_all_features(test)
+# make all the features and save data
+print("Making training features ....")
+test_position = make_relative_positions(test.copy())
+print("test_position df")
+print(test_position.info())
+
+test_dummies = make_dummies(test.copy())
+print("test_dummies df")
+print(test_dummies.info())
+
+test_one_hot = make_one_hot_seq(test.copy())
+print("test_one_hot (120bp sequence) df")
+print(test_one_hot.info())
+
+test_kmers = make_kmer_freq(test.copy()) 
+print("test_kmers df before removing kmers with n's")
+print(kmers.shape)
+test_kmers = test_kmers.loc[:,~test_kmers.columns.str.contains('n', case=False)] 
+print("test_kmers df after removing kmers with n's")
+print(kmers.shape)
+kmers.info()
+
+test_X = pd.concat([test_position, test_dummies, test_one_hot, test_kmers], 1)
+print(test_X.info())
 
 # write to file
 print("Saving testing features ...")
 test_X.to_csv("data/test_X.csv")
-del(test, test_X)
-
+# del(test, test_X)
+print("Done")
