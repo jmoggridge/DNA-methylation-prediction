@@ -51,10 +51,10 @@ def make_relative_positions(df):
 
 
 ## with help from: https://www.kaggle.com/thomasnelson/working-with-dna-sequence-data-for-ml
-def make_kmer_freq(df):
+def make_kmer_freq(df, k):
     """returns vectorized kmer frequency features as dataframe"""
     
-    def get_kmers(dna, k=6):
+    def get_kmers(dna, k):
         """creates list of kmers from dna seq"""
         dna = dna.upper()
         kmers = [dna[x:x+k] for x in range(len(dna)+1-k)]
@@ -62,7 +62,7 @@ def make_kmer_freq(df):
         return(kmers)
     
     # create new column of 
-    mers = df.apply(lambda x: get_kmers(x['seq'], 6), axis = 1)
+    mers = df.apply(lambda x: get_kmers(x['seq'], k), axis = 1)
     tfidf = TfidfVectorizer() 
     X = tfidf.fit_transform(mers)
     kmers = tfidf.get_feature_names()
@@ -118,6 +118,7 @@ def make_one_hot_seq(df):
 #                       make_kmer_freq(df.copy()), 
 #                       make_one_hot_seq(df.copy())], 1))
 # 
+################################################################
 
 ## Main ######
 
@@ -157,37 +158,37 @@ print(train.info())
 
 # make all the features and save data
 print("Making training features ....")
-position = make_relative_positions(train.copy())
+train_position = make_relative_positions(train.copy())
 print("Position df")
-print(position.info())
+print(train_position.info())
+train_position.to_csv('data/train_position.csv')
 
-dummies = make_dummies(train.copy())
+train_dummies = make_dummies(train.copy())
 print("Dummies df")
-print(dummies.info())
+print(train_dummies.info())
+train_dummies.to_csv('data/train_dummies.csv')
 
-one_hot = make_one_hot_seq(train.copy())
+train_one_hot = make_one_hot_seq(train.copy())
 print("One hot 120bp sequence df")
-print(one_hot.info())
+print(train_one_hot.info())
+train_one_hot.to_csv('data/train_one_hot.csv')
 
-kmers = make_kmer_freq(train.copy()) 
+train_kmers = make_kmer_freq(train.copy(), 2) 
 print("kmers df before removing kmers with n's")
-print(kmers.shape)
-kmers = kmers.loc[:,~kmers.columns.str.contains('n', case=False)] 
+print(train_kmers.shape)
+
+train_kmers = train_kmers.loc[:,~train_kmers.columns.str.contains('n', case=False)] 
 print("kmers df after removing kmers with n's")
-print(kmers.shape)
-kmers.info()
+print(train_kmers.shape)
+print(train_kmers.info())
+print(train_kmers.describe())
+train_kmers.to_csv('data/train_kmers.csv')
 
-train_X = pd.concat([position, dummies, one_hot, kmers], 1)
-print(train_X.info())
-
-print("Saving training features ....")
-train_X.to_csv("data/train_X.csv")
-
-# del(train, train_X)
 print("Done with training data")
 
+del(train, train_kmers, train_one_hot, train_dummies, train_position)
 
-####
+####################################################################
 
 ## Same thing for test data
 test = pd.read_csv('data/test.csv')
@@ -218,30 +219,48 @@ print("Making testing features ....")
 # make all the features and save data
 print("Making training features ....")
 test_position = make_relative_positions(test.copy())
+test_position.to_csv('data/test_position.csv')
 print("test_position df")
 print(test_position.info())
 
 test_dummies = make_dummies(test.copy())
+test_dummies.to_csv('data/test_dummies.csv')
 print("test_dummies df")
 print(test_dummies.info())
 
 test_one_hot = make_one_hot_seq(test.copy())
+test_one_hot.to_csv('data/test_one_hot.csv')
 print("test_one_hot (120bp sequence) df")
 print(test_one_hot.info())
 
-test_kmers = make_kmer_freq(test.copy()) 
+test_kmers = make_kmer_freq(test.copy(), 2)
 print("test_kmers df before removing kmers with n's")
-print(kmers.shape)
+print(test_kmers.shape)
 test_kmers = test_kmers.loc[:,~test_kmers.columns.str.contains('n', case=False)] 
 print("test_kmers df after removing kmers with n's")
-print(kmers.shape)
-kmers.info()
+print(test_kmers.shape)
+print(test_kmers.info())
+test_kmers.to_csv('data/test_kmers.csv')
 
-test_X = pd.concat([test_position, test_dummies, test_one_hot, test_kmers], 1)
-print(test_X.info())
-
-# write to file
-print("Saving testing features ...")
-test_X.to_csv("data/test_X.csv")
-# del(test, test_X)
 print("Done")
+
+################################################################
+
+# train_X = pd.concat([position, dummies, one_hot, kmers], 1)
+# print(train_X.info())
+# 
+# print("Saving training features ....")
+# train_X.to_csv("data/train_X.csv")
+
+# del(train, train_X)
+
+# test_X = pd.concat([test_position, test_dummies, test_one_hot, test_kmers], 1)
+# print(test_X.info())
+# 
+# # write to file
+# print("Saving testing features ...")
+# test_X.to_csv("data/test_X.csv")
+
+# del(test, test_X)
+
+
