@@ -215,6 +215,8 @@ Best RF score (CV score=0.915):
 Best RF params
 {'rf__n_estimators': 200, 'rf__min_samples_leaf': 10, 
 'rf__max_features': 'auto', 'rf__bootstrap': True}
+
+
               precision    recall  f1-score   support
 
            0       0.94      0.96      0.95     16194
@@ -229,6 +231,22 @@ weighted avg       0.93      0.93      0.93     23252
 
       algortithm   roc_auc  accuracy  precision    recall        F1
 0  Random forest  0.915296  0.933898   0.910117  0.867951  0.888534
-```
+
+Best RF2 score (CV score=0.924):
+{'rf__n_estimators': 50, 'rf__min_samples_split': 20, 'rf__min_samples_leaf': 1, 'rf__max_features': 'auto', 'rf__max_depth': 100}
+              precision    recall  f1-score   support
+
+           0       0.95      0.97      0.96     16194
+           1       0.92      0.88      0.90      7058
+
+    accuracy                           0.94     23252
+   macro avg       0.93      0.92      0.93     23252
+weighted avg       0.94      0.94      0.94     23252
+
+[[15630   564]
+ [  882  6176]]
+
+        algortithm   roc_auc  accuracy  precision    recall        F1
+0  Random forest 2  0.920104  0.937812    0.91632  0.875035  0.895202```
 
 ### Model evaluation

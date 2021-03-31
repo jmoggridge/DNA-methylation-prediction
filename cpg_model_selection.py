@@ -382,10 +382,10 @@ print('RandomForest search\n')
 rf2 = RandomForestClassifier(random_state = 0)
 rf2_grid = {
     'rf__max_features': ['auto', 'sqrt'],
-    'rf__n_estimators': [1, 20, 50, 100, 250],
-    'rf__max_depth': list([10, 50, 100]).append(None),
-    'rf__min_samples_split': [2, 5, 10],
-    'rf__min_samples_leaf': [1, 2, 5, 10]
+    'rf__n_estimators': [10, 20, 50, 100, 250],
+    'rf__max_depth': list([10, 50, 100, 999999]),
+    'rf__min_samples_split': [2, 5, 10, 20],
+    'rf__min_samples_leaf': [1, 2, 5, 10, 20]
     }
 # 'rf__min_samples_split': [10],
 
@@ -396,7 +396,7 @@ rf2_pipe = Pipeline(steps = [
 rf2_search = RandomizedSearchCV(
     rf2_pipe, 
     rf2_grid,
-    n_iter = 40, 
+    n_iter = 100, 
     cv = 5,
     scoring = auc_scoring,
     n_jobs=-1,
@@ -422,7 +422,7 @@ print(confusion_matrix(y_validate, rf2_y_pred, labels=[0,1]))
 
 # collect key metrics for best random forest
 rf2_perf = pd.DataFrame()
-rf2_perf['algortithm'] = ['Random forest']
+rf2_perf['algortithm'] = ['Random forest 2']
 rf2_perf['roc_auc'] = [metrics.roc_auc_score(y_validate, rf2_y_pred)]
 rf2_perf['accuracy'] = [metrics.accuracy_score(y_validate, rf2_y_pred)]
 rf2_perf['precision'] = [metrics.precision_score(y_validate, rf2_y_pred)]
