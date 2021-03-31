@@ -32,6 +32,43 @@ log_reg_cv_fig <- log_reg_cv %>%
   labs(y = 'ROC AUC', x = 'regularization (C)', 
        subtitle = "Logistic regression hyperparameter tuning by 5-fold CV")
 
+svm_cv <- read_csv("./results/svm_cv_results.csv") %>% 
+  transmute(
+    mean_fit_time,
+    C = round(param_svm__C,3),
+    gamma = factor(round(param_svm__gamma, 3)),
+    params,
+    mean = mean_test_score,
+    std_test_score
+  )
+svm_cv %>% 
+  filter(mean >0.6) %>% 
+  
+  group_by(gamma) %>% 
+  ggplot(aes(x = C, y = mean, color = gamma)) +
+  geom_point() +
+  geom_path() +
+  scale_x_log10() +
+  rcartocolor::scale_color_carto_d(palette = 1) +
+  theme_minimal() 
+
+rf_cv <- read_csv("./results/rf_cv_results.csv") %>% 
+  transmute(
+    estimators = param_rf__n_estimators,
+    min_sample_leaf = factor(param_rf__min_samples_leaf),
+    max_features = param_rf__max_features,
+    mean = mean_test_score,
+    std_err = std_test_score
+  )
+rf_cv %>% 
+  ggplot(aes(x = estimators, y= mean, color = min_sample_leaf)) +
+  geom_path() +
+  geom_point() +
+  scale_x_log10() +
+  facet_wrap(~max_features) +
+  rcartocolor::scale_color_carto_d(palette = 1) +
+  theme_minimal() 
+  
 ```
 
 
@@ -130,6 +167,42 @@ To see if a non-linear solution was required to improve the classification perfo
 
 
 ```
+91 min
+RandomizedSearchCV(
+  cv=5,
+  estimator=Pipeline(steps=[('scaler', StandardScaler()),
+  ('svm', SVC(random_state=0))]),
+  n_iter=40, n_jobs=-1,
+  param_distributions={
+    'svm__C': array([
+      1e-02, 4.64e-02, 2.1e-01, 1e+00, 4.6e+00, 2.1e+01, 1+02, 4.6e+02,
+      2.15e+03, 1e+04
+      ]),
+  'svm__gamma': array([
+      1e-03, 4.64e-03, 2.15e-02, 1e-01, 4.64e-01, 2.1e+00, 1e+01, 4e01,
+      202, 1e+03
+      ])},
+  scoring=make_scorer(roc_auc_score), verbose=3)
+
+* it used the smallest gamma value and medium in C
+Best SVM score (CV score=0.933):
+Best SVM parameters: {'svm__gamma': 0.001, 'svm__C': 1.0}
+
+              precision    recall  f1-score   support
+
+           0       0.96      0.96      0.96     16194
+           1       0.90      0.91      0.90      7058
+
+    accuracy                           0.94     23252
+   macro avg       0.93      0.93      0.93     23252
+weighted avg       0.94      0.94      0.94     23252
+
+[[15496   698]
+ [  653  6405]]
+
+Test performance of SVM model
+  algortithm   roc_auc  accuracy  precision    recall        F1
+0        SVM  0.932189  0.941897   0.901732  0.907481  0.904597
 
 ```
 
@@ -137,5 +210,25 @@ The best model in cross-validation had
 The ROC AUC was..
 On the validation set, the ROC AUC ....
 
+```
+Best RF score (CV score=0.915):
+Best RF params
+{'rf__n_estimators': 200, 'rf__min_samples_leaf': 10, 
+'rf__max_features': 'auto', 'rf__bootstrap': True}
+              precision    recall  f1-score   support
+
+           0       0.94      0.96      0.95     16194
+           1       0.91      0.87      0.89      7058
+
+    accuracy                           0.93     23252
+   macro avg       0.93      0.92      0.92     23252
+weighted avg       0.93      0.93      0.93     23252
+
+[[15589   605]
+ [  932  6126]]
+
+      algortithm   roc_auc  accuracy  precision    recall        F1
+0  Random forest  0.915296  0.933898   0.910117  0.867951  0.888534
+```
 
 ### Model evaluation

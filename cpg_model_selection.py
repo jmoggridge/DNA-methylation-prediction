@@ -20,10 +20,10 @@ svm_grid = {
     }
 rf_grid = {
     'rf__max_features': ['auto', 'sqrt'],
-    'rf__n_estimators': [1, 20, 50, 100],
+    'rf__n_estimators': [1, 20, 50, 100, 250],
     'rf__max_depth': list([10, 50, 100]).append(None),
     'rf__min_samples_split': [2, 5, 10],
-    'rf__min_samples_leaf': [1, 2, 4]
+    'rf__min_samples_leaf': [1, 2, 4, 6, 8,10]
     }
     
 # Minimum number of samples required to split a node
@@ -314,3 +314,125 @@ print(best_models)
 best_models.to_csv("./results/test_performance.csv")
 
 
+
+
+
+### SVM2 ##########
+
+print('\n\n-----------------------------------')
+print('SVM2 search....\n')
+
+# (same workflow as explained for logistic regression)
+# tune the C and gamma parameters for RBF kernel
+scaler = StandardScaler()
+svm = SVC(kernel = 'rbf', random_state = 0)
+svm_pipe = Pipeline(steps = [('scaler', scaler), ('svm', svm)])
+# setup search params
+svm_grid = {
+    'svm__C': np.logspace(-1, 1, 5),
+    'svm__gamma': np.logspace(-5, -2, 5)
+    }
+# perform search
+svm_search2 = GridSearchCV(
+    svm_pipe, 
+    svm_grid, 
+    cv = 5,
+    scoring = auc_scoring,
+    n_jobs = -1, 
+    verbose = 3
+    )
+svm_search2.fit(x_train, y_train)
+
+# save the model to disk
+pickle.dump(svm_search2, open('svm_search2.sav', 'wb'))
+
+# save cv results
+print("Best SVM2 score (CV score=%0.3f):" % svm_search2.best_score_)
+print("Best SVM2 parameters:")
+print(svm_search.best_params_)
+svm2_cv_results = pd.DataFrame(svm_search2.cv_results_)
+svm2_cv_results.to_csv("./results/svm2_cv_results.csv")
+
+# predict validation set using best svm
+svm2_y_pred = svm_search.predict(x_validate)
+print(classification_report(y_validate, svm2_y_pred))
+print(confusion_matrix(y_validate, svm2_y_pred, labels=[0,1]))
+
+# collect key metrics for best svm
+svm2_perf = pd.DataFrame()
+svm2_perf['algortithm'] = ['SVM2']
+svm2_perf['roc_auc'] = [metrics.roc_auc_score(y_validate, svm2_y_pred)]
+svm2_perf['accuracy'] = [metrics.accuracy_score(y_validate, svm2_y_pred)]
+svm2_perf['precision'] = [metrics.precision_score(y_validate, svm2_y_pred)]
+svm2_perf['recall'] = [metrics.recall_score(y_validate, svm2_y_pred)]
+svm2_perf['F1'] = [metrics.f1_score(y_validate, svm2_y_pred)]
+
+print("Test performance of SVM2 model")
+print(svm2_perf)
+
+
+
+
+### RF ##########
+
+print('\n\n-----------------------------------')
+print('RandomForest search\n')
+
+# Random forest models (same workflow as above)
+rf2 = RandomForestClassifier(random_state = 0)
+rf2_grid = {
+    'rf__max_features': ['auto', 'sqrt'],
+    'rf__n_estimators': [1, 20, 50, 100, 250],
+    'rf__max_depth': list([10, 50, 100]).append(None),
+    'rf__min_samples_split': [2, 5, 10],
+    'rf__min_samples_leaf': [1, 2, 5, 10]
+    }
+# 'rf__min_samples_split': [10],
+
+rf2_pipe = Pipeline(steps = [
+    ('scaler', scaler), 
+    ('rf', rf2)]
+    )
+rf2_search = RandomizedSearchCV(
+    rf2_pipe, 
+    rf2_grid,
+    n_iter = 40, 
+    cv = 5,
+    scoring = auc_scoring,
+    n_jobs=-1,
+    verbose=3
+    )
+rf2_search.fit(x_train, y_train)
+# save the model to disk
+pickle.dump(rf2_search, open('rf2_search.sav', 'wb'))
+
+# best rf results
+print("Best RF2 score (CV score=%0.3f):" % rf2_search.best_score_)
+print("Best RF2 params")
+print(rf2_search.best_params_)
+
+# save cv results
+rf2_cv_results = pd.DataFrame(rf2_search.cv_results_)
+rf2_cv_results.to_csv("./results/rf2_cv_results.csv")
+
+# predict validation set using best rf
+rf2_y_pred = rf2_search.predict(x_validate)
+print(classification_report(y_validate, rf2_y_pred))
+print(confusion_matrix(y_validate, rf2_y_pred, labels=[0,1]))
+
+# collect key metrics for best random forest
+rf2_perf = pd.DataFrame()
+rf2_perf['algortithm'] = ['Random forest']
+rf2_perf['roc_auc'] = [metrics.roc_auc_score(y_validate, rf2_y_pred)]
+rf2_perf['accuracy'] = [metrics.accuracy_score(y_validate, rf2_y_pred)]
+rf2_perf['precision'] = [metrics.precision_score(y_validate, rf2_y_pred)]
+rf2_perf['recall'] = [metrics.recall_score(y_validate, rf2_y_pred)]
+rf2_perf['F1'] = [metrics.f1_score(y_validate, rf2_y_pred)]
+
+print("Test performance of Random forest model")
+print(rf2_perf)
+
+
+best_models = pd.concat([best_models, svm2_perf, rf2_perf], 0)
+print(best_models)
+best_models.to_csv("./results/test_performance.csv")
