@@ -5,53 +5,98 @@ date: "05/04/2021"
 output: pdf_document
 ---
 
+<!-- scp jmoggrid@cedar.computecanada.ca:/scratch/jmoggrid/DNA_methylation/results/* ./results/ -->
+
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_chunk$set(echo = TRUE, message = F)
+library(tidyverse)
 ```
 
 ```{r}
-library(tidyverse)
+# what about PCA by dinucleotide composition
+read_csv()
+```
+
+
+```{r}
 log_reg_cv <- read_csv("./results/logreg_cv_results.csv") %>% 
   transmute(
     mean_fit_time,
     C = round(param_logistic__C,5),
     penalty = param_logistic__penalty,
     params,
-    mean_test_score,
-    std_test_score
+    mean = mean_test_score,
+    std_err = std_test_score
   )
 log_reg_cv_fig <- log_reg_cv %>% 
-  filter(mean_test_score> 0.6) %>% 
-  ggplot(aes(C, mean_test_score, color = penalty)) +
+  filter(mean > 0.6) %>% 
+  ggplot(aes(C, mean, color = penalty, fill = penalty)) +
+  geom_ribbon(aes(ymin = mean - std_err, ymax = mean + std_err), 
+              color = FALSE, alpha = 0.2) +
   geom_point() +
   geom_path() +
   scale_x_log10() +
   rcartocolor::scale_color_carto_d(palette = 1) +
+  rcartocolor::scale_fill_carto_d(palette = 1) +
   theme_minimal() +
   theme(legend.position = c(0.8, 0.8)) +
   labs(y = 'ROC AUC', x = 'regularization (C)', 
        subtitle = "Logistic regression hyperparameter tuning by 5-fold CV")
+log_reg_cv_fig
+```
 
+
+```{r}
 svm_cv <- read_csv("./results/svm_cv_results.csv") %>% 
   transmute(
     mean_fit_time,
     C = round(param_svm__C,3),
-    gamma = factor(round(param_svm__gamma, 3)),
+    gamma = round(param_svm__gamma, 3),
     params,
     mean = mean_test_score,
-    std_test_score
+    std_err = std_test_score
   )
-svm_cv %>% 
-  filter(mean >0.6) %>% 
-  
+svm_cv_fig <- svm_cv %>% 
+  mutate(gamma = factor(gamma)) %>% 
   group_by(gamma) %>% 
+  arrange(desc(C)) %>% 
   ggplot(aes(x = C, y = mean, color = gamma)) +
   geom_point() +
   geom_path() +
   scale_x_log10() +
   rcartocolor::scale_color_carto_d(palette = 1) +
-  theme_minimal() 
+  theme_minimal()
+svm_cv_fig
+```
 
+
+```{r}
+svm_cv2 <- read_csv("./results/svm2_cv_results.csv") %>% 
+    transmute(
+    mean_fit_time,
+    C = round(param_svm__C,5),
+    gamma = round(param_svm__gamma, 5),
+    params,
+    mean = mean_test_score,
+    std_err = std_test_score
+  ) %>% 
+  bind_rows(svm_cv)
+svm_cv2 %>% 
+  mutate(gamma = as_factor(gamma)) %>% 
+  arrange(C) %>% 
+  ggplot(aes(x = C, y = mean, color = gamma, fill = gamma)) +
+  geom_ribbon(aes(ymin = mean - std_err, ymax = mean + std_err), 
+              color = FALSE, alpha = 0.2) +
+  geom_point() +
+  geom_path() +
+  scale_x_log10() +
+  rcartocolor::scale_color_carto_d(palette = 1) +
+  rcartocolor::scale_fill_carto_d(palette = 1) +
+  theme_minimal()
+```
+
+
+```{r}
 rf_cv <- read_csv("./results/rf_cv_results.csv") %>% 
   transmute(
     estimators = param_rf__n_estimators,
@@ -60,17 +105,52 @@ rf_cv <- read_csv("./results/rf_cv_results.csv") %>%
     mean = mean_test_score,
     std_err = std_test_score
   )
-rf_cv %>% 
-  ggplot(aes(x = estimators, y= mean, color = min_sample_leaf)) +
+rf_cv_fig <- rf_cv %>% 
+  ggplot(aes(x = estimators, y= mean, color = min_sample_leaf,
+             fill = min_sample_leaf)) +
+    geom_ribbon(aes(ymin = mean - std_err, ymax = mean + std_err), 
+              color = FALSE, alpha = 0.2) +
   geom_path() +
   geom_point() +
   scale_x_log10() +
   facet_wrap(~max_features) +
-  rcartocolor::scale_color_carto_d(palette = 1) +
-  theme_minimal() 
-  
+  rcartocolor::scale_color_carto_d(palette = 2) +
+  rcartocolor::scale_fill_carto_d(palette = 2) +
+  theme_minimal() +
+  labs(y = 'ROC AUC', x = 'n estimators', 
+       subtitle = "Random forest hyperparameter tuning by 5-fold CV")
+
+rf_cv_fig  
 ```
 
+```{r}
+rf2_cv <- read_csv("./results/rf2_cv_results.csv") %>% 
+  transmute(
+    estimators = param_rf__n_estimators,
+    min_sample_leaf = factor(param_rf__min_samples_leaf),
+    min_samples_split = factor(param_rf__min_samples_split), 
+    max_features = param_rf__max_features,
+    max_depth = param_rf__max_depth,
+    mean = mean_test_score,
+    std_err = std_test_score
+  )
+rf2_cv_fig <- rf2_cv %>% 
+  ggplot(aes(x = estimators, y= mean, color = min_sample_leaf,
+             fill = min_sample_leaf)) +
+  geom_point(alpha = 0.85) +
+  scale_x_log10(breaks = c(10, 20, 50, 100, 250)) +
+  
+  facet_grid(max_features ~ min_samples_split) +
+  rcartocolor::scale_color_carto_d(palette = 2) +
+  rcartocolor::scale_fill_carto_d(palette = 2) +
+  theme_linedraw() +
+  labs(y = 'ROC AUC', 
+       x = 'n estimators', 
+       title = "Random forest hyperparameter tuning by 5-fold CV",
+       subtitle = "Panels for max_features (right labels) and min samples per split (top labels)")
+
+rf2_cv_fig 
+```
 
 ## Abstract
 
@@ -204,6 +284,29 @@ Test performance of SVM model
   algortithm   roc_auc  accuracy  precision    recall        F1
 0        SVM  0.932189  0.941897   0.901732  0.907481  0.904597
 
+
+
+Best svm3 score (CV score=0.934)
+Best svm3 parameters:
+{'svm__C': 12.915496650148826, 'svm__gamma': 0.0013894954943731374}
+
+              precision    recall  f1-score   support
+
+           0       0.96      0.96      0.96     16194
+           1       0.91      0.91      0.91      7058
+
+    accuracy                           0.95     23252
+   macro avg       0.93      0.94      0.94     23252
+weighted avg       0.95      0.95      0.95     23252
+
+[[15538   656]
+ [  618  6440]]
+
+Test performance of svm3 model
+
+  algortithm   roc_auc  accuracy  precision   recall       F1
+0       SVM3  0.935965  0.945209   0.907554  0.91244  0.90999
+
 ```
 
 The best model in cross-validation had 
@@ -247,6 +350,31 @@ weighted avg       0.94      0.94      0.94     23252
  [  882  6176]]
 
         algortithm   roc_auc  accuracy  precision    recall        F1
-0  Random forest 2  0.920104  0.937812    0.91632  0.875035  0.895202```
+0  Random forest 2  0.920104  0.937812    0.91632  0.875035  0.895202
+
+
+
+```
 
 ### Model evaluation
+
+
+
+
+
+### Exploratory Data Analysis
+
+```{r}
+read_rds("./figures/fig_islands.rds")
+```
+
+```{r}
+read_rds("./figures/fig_chromosomes.rds")
+```
+
+
+
+```{r}
+read_rds("./results/fig_refgene_groups.rds")
+```
+

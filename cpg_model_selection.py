@@ -436,3 +436,62 @@ print(rf2_perf)
 best_models = pd.concat([best_models, svm2_perf, rf2_perf], 0)
 print(best_models)
 best_models.to_csv("./results/test_performance.csv")
+
+
+
+
+
+
+### svm3 ##########
+
+print('\n\n-----------------------------------')
+print('svm3 search....\n')
+
+# (same workflow as explained for logistic regression)
+# tune the C and gamma parameters for RBF kernel
+scaler = StandardScaler()
+svm = SVC(kernel = 'rbf', random_state = 0)
+svm_pipe = Pipeline(steps = [('scaler', scaler), ('svm', svm)])
+# setup search params
+svm_grid = {
+    'svm__C': np.logspace(-2, 2, 10),
+    'svm__gamma': np.logspace(-5, -2, 8)
+    }
+# perform search
+svm_search3 = GridSearchCV(
+    svm_pipe, 
+    svm_grid, 
+    cv = 5,
+    scoring = auc_scoring,
+    n_jobs = 8, 
+    verbose = 3
+    )
+svm_search3.fit(x_train, y_train)
+
+# save the model to disk
+pickle.dump(svm_search3, open('svm_search3.sav', 'wb'))
+
+# save cv results
+print("Best svm3 score (CV score=%0.3f):" % svm_search3.best_score_)
+print("Best svm3 parameters:")
+print(svm_search3.best_params_)
+svm3_cv_results = pd.DataFrame(svm_search3.cv_results_)
+svm3_cv_results.to_csv("./results/svm3_cv_results.csv")
+
+# predict validation set using best svm
+svm3_y_pred = svm_search3.predict(x_validate)
+print(classification_report(y_validate, svm3_y_pred))
+print(confusion_matrix(y_validate, svm3_y_pred, labels=[0,1]))
+
+# collect key metrics for best svm
+svm3_perf = pd.DataFrame()
+svm3_perf['algortithm'] = ['SVM3']
+svm3_perf['roc_auc'] = [metrics.roc_auc_score(y_validate, svm3_y_pred)]
+svm3_perf['accuracy'] = [metrics.accuracy_score(y_validate, svm3_y_pred)]
+svm3_perf['precision'] = [metrics.precision_score(y_validate, svm3_y_pred)]
+svm3_perf['recall'] = [metrics.recall_score(y_validate, svm3_y_pred)]
+svm3_perf['F1'] = [metrics.f1_score(y_validate, svm3_y_pred)]
+
+print("Test performance of svm3 model")
+print(svm3_perf)
+
