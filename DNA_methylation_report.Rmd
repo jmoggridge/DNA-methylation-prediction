@@ -375,6 +375,10 @@ read_rds("./figures/fig_chromosomes.rds")
 
 
 ```{r}
-read_rds("./results/fig_refgene_groups.rds")
+read_rds("./figures/fig_refgene_groups.rds")
+```
+
+```{r}
+read_rds("./figures/fig_dinucleotide.rds")
 ```
 
