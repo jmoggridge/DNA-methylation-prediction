@@ -8,13 +8,9 @@ output: pdf_document
 <!-- scp jmoggrid@cedar.computecanada.ca:/scratch/jmoggrid/DNA_methylation/results/* ./results/ -->
 
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE, message = F)
+knitr::opts_chunk$set(echo = F, message = F, warning = F, cache = T)
 library(tidyverse)
-```
-
-```{r}
-# what about PCA by dinucleotide composition
-read_csv()
+library(patchwork)
 ```
 
 
@@ -40,63 +36,35 @@ log_reg_cv_fig <- log_reg_cv %>%
   rcartocolor::scale_fill_carto_d(palette = 1) +
   theme_minimal() +
   theme(legend.position = c(0.8, 0.8)) +
-  labs(y = 'ROC AUC', x = 'regularization (C)', 
-       subtitle = "Logistic regression hyperparameter tuning by 5-fold CV")
-log_reg_cv_fig
-```
+  labs(y = 'ROC AUC', x = 'regularization C', 
+       subtitle = "Logistic regression ")
 
 
-```{r}
-svm_cv <- read_csv("./results/svm_cv_results.csv") %>% 
+svm_cv <- read_csv("./results/svm_cv_results.csv")
+svm_cv2 <- read_csv("./results/svm2_cv_results.csv") 
+svm_cv3 <- read_csv("./results/svm3_cv_results.csv") %>% 
+  bind_rows(svm_cv2)%>% 
   transmute(
-    mean_fit_time,
-    C = round(param_svm__C,3),
-    gamma = round(param_svm__gamma, 3),
-    params,
-    mean = mean_test_score,
-    std_err = std_test_score
-  )
-svm_cv_fig <- svm_cv %>% 
-  mutate(gamma = factor(gamma)) %>% 
-  group_by(gamma) %>% 
-  arrange(desc(C)) %>% 
-  ggplot(aes(x = C, y = mean, color = gamma)) +
-  geom_point() +
-  geom_path() +
-  scale_x_log10() +
-  rcartocolor::scale_color_carto_d(palette = 1) +
-  theme_minimal()
-svm_cv_fig
-```
-
-
-```{r}
-svm_cv2 <- read_csv("./results/svm2_cv_results.csv") %>% 
-    transmute(
     mean_fit_time,
     C = round(param_svm__C,5),
     gamma = round(param_svm__gamma, 5),
     params,
     mean = mean_test_score,
     std_err = std_test_score
-  ) %>% 
-  bind_rows(svm_cv)
-svm_cv2 %>% 
+  ) 
+svm_cv_fig <- svm_cv3 %>% 
+  filter(mean>0.51) %>% 
   mutate(gamma = as_factor(gamma)) %>% 
   arrange(C) %>% 
   ggplot(aes(x = C, y = mean, color = gamma, fill = gamma)) +
-  geom_ribbon(aes(ymin = mean - std_err, ymax = mean + std_err), 
-              color = FALSE, alpha = 0.2) +
-  geom_point() +
-  geom_path() +
+  geom_point(alpha = 0.8, size = 0.75) +
+  geom_path(alpha = 0.8) +
   scale_x_log10() +
-  rcartocolor::scale_color_carto_d(palette = 1) +
-  rcartocolor::scale_fill_carto_d(palette = 1) +
-  theme_minimal()
-```
+  scale_color_viridis_d(option = 'C', begin = 0.1, end = 0.92) +
+  scale_fill_viridis_d(option = 'C', begin = 0.1, end = 0.92) +
+  theme_minimal() +
+  labs(y = 'ROC AUC', x = 'regularization (C)', subtitle = 'SVM')
 
-
-```{r}
 rf_cv <- read_csv("./results/rf_cv_results.csv") %>% 
   transmute(
     estimators = param_rf__n_estimators,
@@ -120,10 +88,6 @@ rf_cv_fig <- rf_cv %>%
   labs(y = 'ROC AUC', x = 'n estimators', 
        subtitle = "Random forest hyperparameter tuning by 5-fold CV")
 
-rf_cv_fig  
-```
-
-```{r}
 rf2_cv <- read_csv("./results/rf2_cv_results.csv") %>% 
   transmute(
     estimators = param_rf__n_estimators,
@@ -135,36 +99,42 @@ rf2_cv <- read_csv("./results/rf2_cv_results.csv") %>%
     std_err = std_test_score
   )
 rf2_cv_fig <- rf2_cv %>% 
+  arrange(estimators) %>% 
   ggplot(aes(x = estimators, y= mean, color = min_sample_leaf,
              fill = min_sample_leaf)) +
   geom_point(alpha = 0.85) +
-  scale_x_log10(breaks = c(10, 20, 50, 100, 250)) +
-  
+  # scale_x_log10(breaks = c(25, 50, 100, 250)) +
+  scale_x_log10() +
   facet_grid(max_features ~ min_samples_split) +
   rcartocolor::scale_color_carto_d(palette = 2) +
-  rcartocolor::scale_fill_carto_d(palette = 2) +
-  theme_linedraw() +
+  ggthemes::geom_rangeframe() +
+  theme_minimal() +
+  theme(
+    panel.border = element_rect(colour = 'gray', fill = NA),
+    panel.grid.minor = element_blank(),
+    legend.position = ) +
   labs(y = 'ROC AUC', 
        x = 'n estimators', 
        title = "Random forest hyperparameter tuning by 5-fold CV",
        subtitle = "Panels for max_features (right labels) and min samples per split (top labels)")
-
-rf2_cv_fig 
+rm(svm_cv, svm_cv2, svm_cv3, rf_cv, log_reg_cv)
 ```
 
-## Abstract
 
-DNA methylation is an epigenetic modification of the DNA that can impact gene expression. Many biological processes are mediated through methylation of specific sites and aberrant methylation is linked with disease states.
 
-Prediction of DNA methylation status is of interest ...
+<!-- ## Abstract -->
 
-Sequence features were extracted in the form of one-hot-encodings of 120 bp around the site (+/- 60bp) and k-mer frequencies (dinucleotides) in the 1000 bp around the site.
+<!-- DNA methylation is an epigenetic modification of the DNA that can impact gene expression. Many biological processes are mediated through methylation of specific sites and aberrant methylation is linked with disease states. -->
 
-I evaluated the performance of several machine learning methods on the DNA methylation problem.
+<!-- Prediction of DNA methylation status is of interest ... -->
 
-I found that... model is the best ...
+<!-- Sequence features were extracted in the form of one-hot-encodings of 120 bp around the site (+/- 60bp) and k-mer frequencies (dinucleotides) in the 1000 bp around the site. -->
 
-In predicting unseen data....
+<!-- I evaluated the performance of several machine learning methods on the DNA methylation problem. -->
+
+<!-- I found that... model is the best ... -->
+
+<!-- In predicting unseen data.... -->
 
 
 ## Introduction
@@ -199,7 +169,29 @@ The positional information include the location within the genome and the positi
 
 Two popular approaches to DNA sequence processing are to use a 'bag-of-words' approach with k-mers, or to use one-hot encoding for each position. One-hot encoding the sequence has the advantage of retaining positional information whereas the kmer counts only retain compositional (or motif) information. There is 2 kbp of sequence centered around the CpG sites included in the dataset. I used a combinged approach, where I one-hot encoded the 60 bp upstream and downstream regions and counted kmers over the 2 kbp region.
 
-Use of dimensionality reduction might be appropriate when the number of such features gets very large.
+
+
+### Exploratory Data Analysis
+
+```{r fig.width=8.25, fig.height=3.5, fig.cap="Exploratory analysis of DNA methylation data: (left) chromosome"}
+
+library(patchwork)
+
+a <- read_rds("./figures/fig_islands.rds") +
+  theme(legend.position = c(.8, .9))
+b <- read_rds("./figures/fig_refgene_groups.rds") +
+  theme(legend.position = 'none')
+c <- read_rds("./figures/fig_chromosomes.rds")  +
+  theme(legend.position = 'none')
+panel_A <- ((c + b) / (a)) + plot_layout(guides = 'auto')
+panel_B <- read_rds("./figures/fig_dinucleotide.rds") +
+  theme(legend.position = 'na')
+rm(a,b,c)
+
+
+eda1 <- (panel_A | panel_B )
+```
+
 
 ### Model selection
 
@@ -210,9 +202,6 @@ I first evaluated a basic logistic regression model (l2 norm, C=1.0) to establis
 I then tried to improve on the basic logistic regression model by tuning the logistic regression hyperparameters: models had either Lasso or Ridge regularization and penalty (C) values from a geometric distribution over 0.0001 to 1000. 
 The best model in a random search (50 iterations) was a Lasso (l1 norm) model with C = 0.0336. had an AUC of 0.946 in 5-fold CV and 0.985 on the validation set. 
 
-```{r}
-log_reg_cv_fig
-```
 
 ```
 Best score (ROC AUC=0.946)
@@ -351,10 +340,30 @@ weighted avg       0.94      0.94      0.94     23252
 
         algortithm   roc_auc  accuracy  precision    recall        F1
 0  Random forest 2  0.920104  0.937812    0.91632  0.875035  0.895202
-
-
-
 ```
+
+
+
+
+```{r fig.width = 8, fig.height=3, fig.cap="Grid search cross-validation ROC AUC for Logistic regression (left) and SVM (right) classifiers"}
+log_reg_cv_fig + svm_cv_fig 
+```
+
+
+```{r}
+rf_cv_fig  
+rf2_cv_fig
+```
+
+
+```{r}
+tribble(
+  ~algortithm,   ~roc_auc,  ~accuracy,  ~precision,    ~recall,        ~F1
+  
+)
+```
+
+
 
 ### Model evaluation
 
@@ -362,23 +371,4 @@ weighted avg       0.94      0.94      0.94     23252
 
 
 
-### Exploratory Data Analysis
-
-```{r}
-read_rds("./figures/fig_islands.rds")
-```
-
-```{r}
-read_rds("./figures/fig_chromosomes.rds")
-```
-
-
-
-```{r}
-read_rds("./figures/fig_refgene_groups.rds")
-```
-
-```{r}
-read_rds("./figures/fig_dinucleotide.rds")
-```
 

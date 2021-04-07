@@ -11,7 +11,8 @@ meth <- meth %>%
     methylated = ifelse(Beta==1, 'methylated', 'unmethylated')
   )
 meth <- meth %>% 
-  mutate(across(everything(), ~ ifelse(is.na(.x), 'None', .x)))
+  mutate(across(everything(),
+                ~ ifelse(is.na(.x), 'None', .x)))
 
 fig1 <- meth %>% 
   group_by(island, methylated) %>% 
@@ -20,7 +21,7 @@ fig1 <- meth %>%
   geom_col() +
   rcartocolor::scale_color_carto_d(palette = 2) +
   rcartocolor::scale_fill_carto_d(palette = 2) +
-  theme_light() +
+  theme_minimal() +
   theme(legend.position = c(0.7, 0.7)) +
   labs(subtitle = 'Relation to CpG island',
        x = '', y ='', color = '', fill = '')
@@ -41,7 +42,7 @@ fig2 <- meth %>%
   geom_col() +
   rcartocolor::scale_fill_carto_d(palette = 2) +
   theme_minimal() +
-  labs(subtitle = 'Chromosome', y = 'proportion of sites', fill = '')
+  labs(y = 'proportion of sites', fill = '')
 fig2
 write_rds(fig2, "./figures/fig_chromosomes.rds")
 rm(fig2)
@@ -115,9 +116,11 @@ fig4 <- meth_longseq_kmers %>%
   geom_density(alpha = 0.1) +
   facet_wrap(~ dinucleotide) +
   rcartocolor::scale_fill_carto_d(palette = 2) +
-  labs(x= '% composition', color ='',
+  rcartocolor::scale_color_carto_d(palette = 2) +
+  labs(x= '% composition', color ='', fill = '', 
        subtitle = "DNA composition over 2 kbp around CpG sites") +
   theme_minimal() +
+  xlim(0, 15) +
   theme(panel.grid = element_blank(), 
         axis.text.y.left = element_blank(),
         axis.line.y = element_blank())
@@ -150,10 +153,9 @@ meth_longseq_kmers %>%
   ggplot(aes(CG_over_CA_TG, color = methylated, fill = methylated)) +
   geom_density(alpha = 0.1) +
   labs(x= "CG/(CA+TG)", color = '', 
-       subtitle = "DNA composition over 2 kbp around CpG sites") +
+       subtitle = "Dinucleotide composition 1kb flanking CpG sites") +
   theme_minimal() +
   facet_wrap(~island)
-  
   
 
 meth_shortseq_kmers <- 
@@ -170,42 +172,19 @@ meth_shortseq_kmers <-
 meth_shortseq_kmers %>% 
   pivot_longer(AA:TT, names_to = 'dinucleotide',
                values_to = 'prop') %>% 
-  ggplot(aes(x = prop*100, color = methylated, fill = methylated)) +
-  geom_histogram(alpha = 0.1, position = 'dodge') +
+  ggplot(aes(x = prop*100, 
+             color = methylated, 
+             fill = methylated)) +
+  geom_density(alpha = 0.1, outline.type = 'full') +
   facet_wrap(~ dinucleotide, scales = 'free') +
+  rcartocolor::scale_color_carto_d(palette = 2) +
   rcartocolor::scale_fill_carto_d(palette = 2) +
-  labs(x= '% composition', 
-       subtitle = "DNA composition over 120 kbp around CpG sites") +
+  labs(x = '% composition', 
+       subtitle = "Dinucleotide composition 60 bp flanking CpG sites") +
   theme_minimal() +
   theme(panel.grid = element_blank(), 
         axis.text.y.left = element_blank(),
         axis.line.y = element_blank())
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 

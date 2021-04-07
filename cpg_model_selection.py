@@ -34,13 +34,10 @@ rf_grid = {
 print("loading packages...\n")
 import numpy as np
 import pandas as pd
-import matplotlib.pyplot as plt
-# Save models w pickle
-import pickle 
 # parts of the pipeline for model selection
-from sklearn.model_selection import StratifiedShuffleSplit, GridSearchCV, RandomizedSearchCV, cross_val_score
 from sklearn.preprocessing import StandardScaler
 from sklearn.decomposition import PCA
+from sklearn.model_selection import StratifiedShuffleSplit, GridSearchCV, RandomizedSearchCV, cross_val_score
 from sklearn.pipeline import Pipeline
 from sklearn import metrics
 from sklearn.metrics import make_scorer, roc_auc_score, confusion_matrix, classification_report
@@ -49,6 +46,8 @@ from sklearn.linear_model import LogisticRegression
 from sklearn.svm import SVC
 from sklearn.ensemble import RandomForestClassifier
 # from xgboost import XGBClassifier
+# Save models w pickle
+import pickle 
 
 
 
@@ -495,3 +494,57 @@ svm3_perf['F1'] = [metrics.f1_score(y_validate, svm3_y_pred)]
 print("Test performance of svm3 model")
 print(svm3_perf)
 
+
+## Do a linear SVM with a big grid search to compete with logistic regression
+# Stochastic gradient descent implementation is supposed to be much faster
+# specifying loss function as 'hinge' gives a linear SVM model.
+
+print('\n\n-----------------------------------')
+print('Linear svm search....\n')
+
+# (same workflow as explained for logistic regression)
+# tune the C and gamma parameters for RBF kernel
+scaler = StandardScaler()
+svm = SVC(kernel = 'linear', random_state = 0)
+svm_pipe = Pipeline(steps = [('scaler', scaler), ('svm', svm)])
+# setup search params
+svm_grid = {'svm__C': np.logspace(-4, 4, 50)}
+# perform search
+svm_search4 = GridSearchCV(
+    svm_pipe, 
+    svm_grid, 
+    cv = 5,
+    scoring = auc_scoring,
+    n_jobs = 16, 
+    verbose = 3
+    )
+svm_search4.fit(x_train, y_train)
+
+# save the model to disk
+pickle.dump(svm_search4, open('svm_search4.sav', 'wb'))
+
+# save cv results
+print("Best svm4 score (CV score=%0.3f):" % svm_search4.best_score_)
+print("Best svm4 parameters:")
+print(svm_search4.best_params_)
+svm4_cv_results = pd.DataFrame(svm_search4.cv_results_)
+svm4_cv_results.to_csv("./results/svm4_cv_results.csv")
+
+# predict validation set using best svm
+svm4_y_pred = svm_search4.predict(x_validate)
+print(classification_report(y_validate, svm4_y_pred))
+print(confusion_matrix(y_validate, svm4_y_pred, labels=[0,1]))
+
+# collect key metrics for best svm
+svm4_perf = pd.DataFrame()
+svm4_perf['algortithm'] = ['SVM3']
+svm4_perf['roc_auc'] = [metrics.roc_auc_score(y_validate, svm4_y_pred)]
+svm4_perf['accuracy'] = [metrics.accuracy_score(y_validate, svm4_y_pred)]
+svm4_perf['precision'] = [metrics.precision_score(y_validate, svm4_y_pred)]
+svm4_perf['recall'] = [metrics.recall_score(y_validate, svm4_y_pred)]
+svm4_perf['F1'] = [metrics.f1_score(y_validate, svm4_y_pred)]
+
+print("Test performance of svm4 model")
+print(svm4_perf)
+
+svm4_perf.to_csv("./results/svm4_perf.csv")
