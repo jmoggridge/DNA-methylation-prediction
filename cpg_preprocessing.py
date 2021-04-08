@@ -186,7 +186,10 @@ train_kmers.to_csv('data/train_kmers.csv')
 
 print("Done with training data")
 
-del(train, train_kmers, train_one_hot, train_dummies, train_position)
+train_X = pd.concat([train_position, train_dummies, train_one_hot, train_kmers], 1) 
+train_X_columns = list(train_X.columns.values)
+
+# del(train, train_kmers, train_one_hot, train_dummies, train_position)
 
 ####################################################################
 
@@ -242,7 +245,17 @@ print(test_kmers.shape)
 print(test_kmers.info())
 test_kmers.to_csv('data/test_kmers.csv')
 
+# join test data features:
+test_X = pd.concat([test_position, test_dummies, test_one_hot, test_kmers], 1)
+
+# make sure test has the same columns as train
+test_X = test_X[test_X.columns.intersection(train_X_columns)]
+test_X.shape
+
+# write to data/
+test_X.to_csv('data/test_X.csv')
 print("Done")
+
 
 ################################################################
 

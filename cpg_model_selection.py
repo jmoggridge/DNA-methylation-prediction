@@ -36,7 +36,6 @@ import numpy as np
 import pandas as pd
 # parts of the pipeline for model selection
 from sklearn.preprocessing import StandardScaler
-from sklearn.decomposition import PCA
 from sklearn.model_selection import StratifiedShuffleSplit, GridSearchCV, RandomizedSearchCV, cross_val_score
 from sklearn.pipeline import Pipeline
 from sklearn import metrics
@@ -45,7 +44,6 @@ from sklearn.metrics import make_scorer, roc_auc_score, confusion_matrix, classi
 from sklearn.linear_model import LogisticRegression
 from sklearn.svm import SVC
 from sklearn.ensemble import RandomForestClassifier
-# from xgboost import XGBClassifier
 # Save models w pickle
 import pickle 
 
@@ -67,15 +65,12 @@ print("Training Y shape:")
 print(train_Y.shape)
 
 
-test_position = pd.read_csv('data/test_position.csv')
-test_dummies = pd.read_csv('data/test_dummies.csv')
-test_one_hot = pd.read_csv('data/test_one_hot.csv')
-test_kmers = pd.read_csv('data/test_kmers.csv')
-test_X = pd.concat([test_position, test_dummies, test_one_hot, test_kmers], 1)
-
 ## Splitting data
 print("\n\nSplitting data...\n")
-# Split train/validate datasets - set test_size to 0.5 once ready
+
+# 20/80 Split train/validate datasets - to save time
+# set seed for reproducibility
+
 sss = StratifiedShuffleSplit(n_splits=1, test_size=0.8, random_state=1)
 sss.get_n_splits(train_X, train_Y)
 
@@ -104,7 +99,6 @@ del(train_X, train_Y, sss, train_index, validate_index)
 scaler = StandardScaler()
 # roc_auc scoring for model selection
 auc_scoring = make_scorer(metrics.roc_auc_score) 
-
 
 
 
