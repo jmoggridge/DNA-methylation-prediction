@@ -121,37 +121,39 @@ rm(svm_cv, svm_cv2, svm_cv3, rf_cv, log_reg_cv)
 
 ## Introduction
 
-DNA methylation is a heritable, yet reversible epigenetic modification that is involved in regulating transcription and chromatin structure and can be influenced by environmental factors [@Schübeler2015]. Cytosine methylation at specific CpG sites is important for many physiological processes including genomic imprinting, embryonic development, and silencing of transposable elements [@Hollister2009]. Much attention has been directed towards understanding the role of aberrant DNA methylation patterns in complex disease progression, particularly in cancer [@Vidal2017], but also for rheumatoid arthritis [@cribbs_towards_2015], neuro-degenerative disorders [@nabais_meta-analysis_2021], and others.
+DNA methylation is a heritable, yet reversible epigenetic modification that is involved in regulating transcription and chromatin structure and can be influenced by environmental factors [@Schübeler2015]. Cytosine methylation at specific CpG sites is important for many physiological processes including genomic imprinting, embryonic development, and silencing of transposable elements [@Hollister2009]. Much attention has been directed towards characterizing the role of aberrant DNA methylation patterns in complex disease progression, particularly in cancer [@Vidal2017], but also for rheumatoid arthritis [@cribbs_towards_2015], neuro-degenerative disorders [@nabais_meta-analysis_2021], and others.
 
-Assays to determine the presence or absence of methyl groups at CpG sites, including bisulfite-free sequencing and microarrays, have been developed to map methylated sites across the genome. However, these methods are somewhat restricted their utility due to cost, complexity, and high error rates .
+Assays to determine the presence or absence of methyl groups at CpG sites, including bisulfite sequencing and hybridization microarrays, have been developed to map methylated sites across the genome. However, these methods can be restricted in their utility due to cost, procedural complexity, limited coverage, and/or high error rates [@kurdyukov2016]. Naturally, predictive models have been developed for this task.
 
-predictive models have been developed for this task.
-
-In this work, I sought to develop and evaluate machine learning models for the problem of predicting DNA methylation status at CpG sites. Competitions are frequently used in to compare the efforts of different research groups towards solving particular bioinformatics problems, eg. protein structure prediction (**CITE**). In keeping with this, I used a publicly available dataset of DNA methylation sites that was previously used in a Kaggle competition (<https://www.kaggle.com/c/predict-dna-methylation>) to compare my results with previous efforts. Features were generated using the flanking sequence regions using one-hot-encoding and k-mer counting approaches. For model tuning, I used 5-fold cross validation to evaluate logistic regression, support vector machines (SVM), and random forest (RF) models. The best set of hyperparameters we chosen on the basis of their receiver-operator characteristic area under the curve (ROC AUC). Models were then used to predict the methylation status of unseen CpG sites for comparison.
+In this work, I sought to develop and evaluate machine learning models for the problem of predicting DNA methylation status at CpG sites. Competitions are frequently used in to compare the efforts of different research groups towards solving particular bioinformatics problems, eg. protein structure prediction (**CITE**). In keeping with this, I used a publicly available dataset of DNA methylation sites that was previously used in a Kaggle competition (<https://www.kaggle.com/c/predict-dna-methylation>) to compare my results with previous efforts. Features were generated using the flanking sequence regions using one-hot-encoding and k-mer counting approaches. For model tuning, I used 5-fold cross validation to evaluate logistic regression, support vector machines (SVM), and random forest (RF) models. The best set of hyperparameters we chosen on the basis of their receiver-operator characteristic area under the curve (AUC). Models were then used to predict the methylation status of unseen CpG sites for comparison.
 
 ## Methods
 
-### Dataset
+#### Dataset
 
-The DNA methylation dataset used in this work is comprised of positional, categorical, and sequence information. As such, feature extraction must be performed to make use of the non-numeric information, especially the DNA sequences. Nominal information include (1) the relation to any nearby CpG island (island, north/south shelf or shore, or none); (2) location relative to genes (TSS regions, UTRs, gene body, 1st exon); (3) associated regulatory features (gene/non-gene/promoter associations & cell-type specificity).
+The DNA methylation dataset used in this work was previously split into a set training of \~30k CpG sites with methylation status and an unlabeled set of 20k for predictions to be submitted for the competition. The data are comprised of positional, categorical, and DNA sequence information. As such, feature extraction must be performed to make use of the non-numeric information, especially the DNA sequences. Categorical predictors include (1) the relation to any nearby CpG island (island, north/south shelf or shore, or none); (2) location relative to genes (TSS regions, UTRs, gene body, 1st exon); (3) associated regulatory features: gene/non-gene/promoter associations & the cell-type specificity of these (T/F).
 
 The positional information include the location within the genome and the position of any nearby CpG islands. The training data is comprised entirely of sites on chromosomes 1-10 and the test data has sites from chromosomes 11-22. I extracted the distance to the nearest island (if one exist) and retained only this information, as the exact location information would be easy for ML models to memorize.
 
-### Feature extraction
+#### Feature extraction
 
 Two popular approaches to DNA sequence processing are to use a 'bag-of-words' approach with k-mers, or to use one-hot encoding for each position. One-hot encoding the sequence has the advantage of retaining positional information whereas the k-mer counts only retain compositional (or motif) information. There is 2 kbp of sequence centered around the CpG sites included in the dataset. I used a combined approach, where I one-hot encoded the 60 bp upstream and downstream regions and counted kmers over the 2 kbp region.
 
-### Predictive modelling
+#### Predictive modeling
 
-Machine learning methods were applied to the data using the popular Sci-kit learn framework (**CITE**).
+Machine learning methods were applied to the data using the popular Scikit Learn framework [@scikit-learn]. The labeled data were shuffled and partitioned into stratified subsets for 5-fold cross-validation (20%) and validation (80%). The same folds were used in each cross-validation by setting the random seed. The same cross validation procedure was performed for each of logistic regression, SVM, and RF; to find optimal model tunings a grid-search was perform with a wide range of hyperparameters. For logistic regression, l1 and l2 norms with varied regularization penalty strengths (C); for SVM, separate grid searches were performed with linear and radial basis function (RBF) kernels, where the C and gamma (for RBF only) hyperparameters were tuned. RF models were trained used varied number of trees, minimum samples per split and per leaf, maximum number of features (square root of the number of predictors or 'auto'),
+
+Best models were selected by mean AUC.
+
+Each of these was then used to predict the validation set.
+
+The best model was used to predict the competition test set.
 
 ## Results
 
 ### Exploratory analysis
 
 ```{r fig.width=8.25, fig.height=3.5, fig.cap="Exploratory analysis of DNA methylation data: (top-left) methylation by chromosome; (top-right) presence of regulatory elements, (bottom) relation to CpG island; (right) dinucleotide frequency distribution for methylated and unmethylated CpG sites."}
-
-library(patchwork)
 
 a <- read_rds("./figures/fig_islands.rds") +
   theme(legend.position = c(.8, .9))
@@ -163,7 +165,6 @@ panel_A <- ((c + b) / (a)) + plot_layout(guides = 'auto')
 panel_B <- read_rds("./figures/fig_dinucleotide.rds") +
   theme(legend.position = 'na')
 rm(a,b,c)
-
 
 eda1 <- (panel_A | panel_B )
 ```

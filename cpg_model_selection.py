@@ -96,12 +96,16 @@ y_validate.shape
 
 del(train_X, train_Y, sss, train_index, validate_index)
 
+
+
 ### Setup model selection pipelines
 
 # set up scaler to fit inside cv
 scaler = StandardScaler()
 # roc_auc scoring for model selection
 auc_scoring = make_scorer(metrics.roc_auc_score) 
+
+
 
 
 ### Baseline model
@@ -113,12 +117,13 @@ score = cross_val_score(
 print("vanilla logistic regression 10-fold cv score")
 print(score.mean())
 
-
 basic_model = LogisticRegression(max_iter=10000)
 basic_model.fit(x_train, y_train)
 probs = basic_model.predict_proba(x_validate)
-
 roc_auc_score(y_validate, probs[:, 1])
+
+
+
 ### Logistic Regression ##########
 
 print('\n\n-----------------------------------')
@@ -144,7 +149,7 @@ logreg_search = GridSearchCV(
     logreg_grid, 
     scoring = auc_scoring,
     cv = 5,
-    n_jobs = -1, 
+    n_jobs = 10, 
     verbose = 3 
     )
 
@@ -263,7 +268,7 @@ rf_search = RandomizedSearchCV(
     n_iter = 40, 
     cv = 5,
     scoring = auc_scoring,
-    n_jobs=-1,
+    n_jobs=10,
     verbose=3
     )
 rf_search.fit(x_train, y_train)
@@ -337,7 +342,7 @@ svm_search2 = GridSearchCV(
     svm_grid, 
     cv = 5,
     scoring = auc_scoring,
-    n_jobs = -1, 
+    n_jobs = 10, 
     verbose = 3
     )
 svm_search2.fit(x_train, y_train)
@@ -398,7 +403,7 @@ rf2_search = RandomizedSearchCV(
     n_iter = 100, 
     cv = 5,
     scoring = auc_scoring,
-    n_jobs=-1,
+    n_jobs= 10,
     verbose=3
     )
 rf2_search.fit(x_train, y_train)
@@ -462,7 +467,7 @@ svm_search3 = GridSearchCV(
     svm_grid, 
     cv = 5,
     scoring = auc_scoring,
-    n_jobs = 8, 
+    n_jobs = 10, 
     verbose = 3
     )
 svm_search3.fit(x_train, y_train)
@@ -495,6 +500,10 @@ print("Test performance of svm3 model")
 print(svm3_perf)
 
 
+
+
+
+
 ## Do a linear SVM with a big grid search to compete with logistic regression
 # Stochastic gradient descent implementation is supposed to be much faster
 # specifying loss function as 'hinge' gives a linear SVM model.
@@ -502,20 +511,24 @@ print(svm3_perf)
 print('\n\n-----------------------------------')
 print('Linear svm search....\n')
 
-# (same workflow as explained for logistic regression)
-# tune the C and gamma parameters for RBF kernel
+# set up scaler to fit inside cv
 scaler = StandardScaler()
+# roc_auc scoring for model selection
+auc_scoring = make_scorer(metrics.roc_auc_score) 
+
+# SVC model with linear kernel 
 svm = SVC(kernel = 'linear', random_state = 0)
 svm_pipe = Pipeline(steps = [('scaler', scaler), ('svm', svm)])
-# setup search params
-svm_grid = {'svm__C': np.logspace(-4, 4, 50)}
+
+# tune the C parameter over 10e-4 to 10e4
+svm_grid = {'svm__C': np.logspace(-4, 4, 40)}
 # perform search
 svm_search4 = GridSearchCV(
     svm_pipe, 
     svm_grid, 
     cv = 5,
     scoring = auc_scoring,
-    n_jobs = 16, 
+    n_jobs = 10, 
     verbose = 3
     )
 svm_search4.fit(x_train, y_train)
