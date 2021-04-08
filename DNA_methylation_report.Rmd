@@ -4,14 +4,13 @@ author: "J Moggridge"
 date: "05/04/2021"
 output: pdf_document
 bibliography: references.bib
-style:
 ---
 
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = F, message = F, warning = F, cache = T)
+knitr::opts_chunk$set(echo = F, message = F, warning = F, cache = F)
 ```
 
-```{r}
+```{r plot_everything}
 library(tidyverse)
 library(patchwork)
 
@@ -24,9 +23,9 @@ c <- read_rds("./figures/fig_chromosomes.rds")  +
 panel_A <- ((c + b) / (a)) + plot_layout(guides = 'auto')
 panel_B <- read_rds("./figures/fig_dinucleotide.rds") +
   theme(legend.position = 'na')
-rm(a,b,c)
 
 eda1 <- (panel_A | panel_B )
+rm(a,b,c, panel_A, panel_B)
 
 log_reg_cv <- read_csv("./results/logreg_cv_results.csv") %>% 
   transmute(
@@ -35,24 +34,38 @@ log_reg_cv <- read_csv("./results/logreg_cv_results.csv") %>%
     penalty = param_logistic__penalty,
     params,
     mean = mean_test_score,
-    std_err = std_test_score
+    sd = std_test_score
   )
 log_reg_cv_fig <- log_reg_cv %>% 
   filter(mean > 0.6) %>% 
   ggplot(aes(C, mean, color = penalty, fill = penalty)) +
-  geom_ribbon(aes(ymin = mean - std_err, ymax = mean + std_err), 
-              color = FALSE, alpha = 0.2) +
-  geom_point() +
   geom_path() +
+  geom_point() +
+  geom_errorbar(aes(ymin = mean - sd, ymax = mean + sd)) +
   scale_x_log10() +
   rcartocolor::scale_color_carto_d(palette = 1) +
   rcartocolor::scale_fill_carto_d(palette = 1) +
   theme_minimal() +
   theme(legend.position = c(0.8, 0.8)) +
-  labs(y = 'ROC AUC', x = 'regularization C', 
+  labs(y = 'AUC', x = 'C', 
        subtitle = "Logistic regression ")
 
+# linear SVM
+svm4 <- read_csv("./results/svm4_cv_results.csv") %>% 
+  transmute(C = param_svm__C,
+            mean = mean_test_score,
+            sd = std_test_score)
 
+linear_svm_fig <- svm4 %>% 
+  ggplot(aes(C, mean)) +
+  geom_path(alpha = 0.95, color = 'gray') +
+  geom_point() +
+  geom_errorbar(aes(ymin = mean - sd, ymax = mean + sd)) +
+  scale_x_log10() +
+  labs(y = 'AUC') +
+  theme_bw()
+  
+# RBF SVM
 svm_cv <- read_csv("./results/svm_cv_results.csv")
 svm_cv2 <- read_csv("./results/svm2_cv_results.csv") 
 svm_cv3 <- read_csv("./results/svm3_cv_results.csv") %>% 
@@ -76,68 +89,60 @@ svm_cv_fig <- svm_cv3 %>%
   scale_color_viridis_d(option = 'C', begin = 0.1, end = 0.92) +
   scale_fill_viridis_d(option = 'C', begin = 0.1, end = 0.92) +
   theme_minimal() +
-  labs(y = 'ROC AUC', x = 'regularization (C)', subtitle = 'SVM')
+  labs(y = 'AUC', x = 'C')
 
-rf_cv <- read_csv("./results/rf_cv_results.csv") %>% 
-  transmute(
-    estimators = param_rf__n_estimators,
-    min_sample_leaf = factor(param_rf__min_samples_leaf),
-    max_features = param_rf__max_features,
-    mean = mean_test_score,
-    std_err = std_test_score
-  )
-rf_cv_fig <- rf_cv %>% 
-  ggplot(aes(x = estimators, y= mean, color = min_sample_leaf,
-             fill = min_sample_leaf)) +
-    geom_ribbon(aes(ymin = mean - std_err, ymax = mean + std_err), 
-              color = FALSE, alpha = 0.2) +
-  geom_path() +
-  geom_point() +
-  scale_x_log10() +
-  facet_wrap(~max_features) +
-  rcartocolor::scale_color_carto_d(palette = 2) +
-  rcartocolor::scale_fill_carto_d(palette = 2) +
-  theme_minimal() +
-  labs(y = 'ROC AUC', x = 'n estimators', 
-       subtitle = "Random forest hyperparameter tuning by 5-fold CV")
+# Random Forest 
 
-rf2_cv <- read_csv("./results/rf2_cv_results.csv") %>% 
+
+rf_cv <- 
+  bind_rows(
+    read_csv("./results/rf2_cv_results.csv") %>% 
+      mutate(data=2),
+    read_csv("./results/rf_cv_results.csv") %>% 
+      mutate(
+        param_rf__min_samples_split = 2,
+        param_rf__max_depth = 99999,
+        data = 1
+      )
+  ) %>% 
+  filter(param_rf__min_samples_leaf <= 50) %>%
   transmute(
-    estimators = param_rf__n_estimators,
-    min_sample_leaf = factor(param_rf__min_samples_leaf),
-    min_samples_split = factor(param_rf__min_samples_split), 
-    max_features = param_rf__max_features,
+    estimators = factor(param_rf__n_estimators),
+    mss = factor(param_rf__min_samples_split), 
+    msl = factor(param_rf__min_samples_leaf),
+    feat = factor(param_rf__max_features),
     max_depth = param_rf__max_depth,
     mean = mean_test_score,
-    std_err = std_test_score
-  )
-rf2_cv_fig <- rf2_cv %>% 
-  arrange(estimators) %>% 
-  ggplot(aes(x = estimators, y= mean, color = min_sample_leaf,
-             fill = min_sample_leaf)) +
-  geom_point(alpha = 0.85) +
-  # scale_x_log10(breaks = c(25, 50, 100, 250)) +
-  scale_x_log10() +
-  facet_grid(max_features ~ min_samples_split) +
-  rcartocolor::scale_color_carto_d(palette = 2) +
-  ggthemes::geom_rangeframe() +
-  theme_minimal() +
-  theme(
-    panel.border = element_rect(colour = 'gray', fill = NA),
-    panel.grid.minor = element_blank(),
-    legend.position = ) +
-  labs(y = 'ROC AUC', 
-       x = 'n estimators', 
-       title = "Random forest hyperparameter tuning by 5-fold CV",
-       subtitle = "Panels for max_features (right labels) and min samples per split (top labels)")
-rm(svm_cv, svm_cv2, svm_cv3, rf_cv, log_reg_cv)
+    std_err = std_test_score,
+  ) %>% 
+  arrange(desc(mean))
+best <- rf_cv[1,]
+
+rf_cv_fig <- rf_cv %>% 
+  ggplot(aes(y = factor(estimators), x = factor(msl), fill = mean)) +
+  geom_tile() +
+  geom_point(data=best, 
+             aes(y = factor(estimators), x = factor(msl))) +
+  facet_grid(feat ~ mss, labeller = label_both) +
+  scale_fill_viridis_c(option = 'A') +
+  labs(y = 'n trees', x = 'min. samples / leaf', fill = 'AUC') +
+  theme_dark() +
+  theme(strip.background = element_blank(),
+        strip.text = element_text(color = 'black'))
+  
+  
+# 
+# rm(svm_cv, svm_cv2, svm_cv3, rf_cv, log_reg_cv)
+
 ```
+
 
 ## Introduction
 
-DNA methylation is a heritable, yet reversible epigenetic modification that is involved in regulating transcription and chromatin structure and can be influenced by environmental factors [@Schübeler2015]. Cytosine methylation at specific CpG sites is important for many physiological processes including genomic imprinting, embryonic development, and silencing of transposable elements [@Hollister2009]. Much attention has been directed towards characterizing the role of aberrant DNA methylation patterns in complex disease progression, particularly in cancer [@Vidal2017], but also for rheumatoid arthritis [@cribbs_towards_2015], neuro-degenerative disorders [@nabais_meta-analysis_2021], and others.
+DNA methylation is an epigenetic modification that is involved in regulating transcription and chromatin structure and can be influenced by environmental factors [@Schübeler2015]. Cytosine methylation at specific CpG sites is important for many physiological processes including genomic imprinting, embryonic development, and silencing of transposable elements [@Hollister2009]. Methylation patterns are inheritable but also reversible and influenced by environmental factors. Much attention has been directed towards characterizing the role of aberrant DNA methylation patterns in complex disease progression, particularly in cancer [@Vidal2017], but also for rheumatoid arthritis [@cribbs_towards_2015], neuro-degenerative disorders [@nabais_meta-analysis_2021], and others.
 
-Assays to determine the presence or absence of methyl groups at CpG sites, including bisulfite sequencing and hybridization microarrays, have been developed to map methylated sites across the genome. However, these methods can be restricted in their utility due to cost, procedural complexity, limited coverage, and/or high error rates [@kurdyukov2016]. Naturally, predictive models have been developed for this task.
+The mapping of methylated sites across the genome can be accomplished through bisulfite sequencing, microarrays, mass spectrometry, ELISA, *etc.*. However, these methods have issues with high cost, being laborious, limited coverage, and/or high error rates [@kurdyukov2016].
+Naturally, predictive models for DNA methylation status are an attractive tool, eg. for imputing missing positions. These have already been applied using SVM, deep neural networks, random forests
 
 In this work, I sought to develop and evaluate machine learning models for the problem of predicting DNA methylation status at CpG sites. Competitions are frequently used in to compare the efforts of different research groups towards solving particular bioinformatics problems, eg. protein structure prediction (**CITE**). In keeping with this, I used a publicly available dataset of DNA methylation sites that was previously used in a Kaggle competition (<https://www.kaggle.com/c/predict-dna-methylation>) to compare my results with previous efforts. Features were generated using the flanking sequence regions using one-hot-encoding and k-mer counting approaches. For model tuning, I used 5-fold cross validation to evaluate logistic regression, support vector machines (SVM), and random forest (RF) models. The best set of hyperparameters we chosen on the basis of their receiver-operator characteristic area under the curve (AUC). Models were then used to predict the methylation status of unseen CpG sites for comparison.
 
@@ -161,24 +166,22 @@ Best models were selected by mean AUC and fit to the full training data. Each of
 
 The best model was used to predict the competition test set.
 
-## Results
+## Results and Discussion
 
 ### Exploratory analysis
 
-Exploratory data analysis revealed that the categorical data for position of CpG sites in relation to CpG islands and to structural elements of genes is useful in discriminating the methylation status. 
-Sites that are within islands or in their 'shores' are generally methylated, while sites further away in the 'shelf' and those not associated with any island tend to be unmethylated. With regards to genes, sites within gene bodies and 3'UTRs tend to be unmethylated, whereas those associated with promoter regions (TSS200, TSS1500), 5'UTRs, and 1st exons are all highly methylated. The composition of flanking sequences of methylated and unmethylated sites differ for three dinucleotides (CG, CA, TG), with TG and CA are over-represented in methylated sites and CG under-represented.
+Exploratory data analysis revealed that the categorical data for position of CpG sites in relation to CpG islands and to structural elements of genes is useful in discriminating the methylation status (fig. 1 left). 
+Sites that are within islands or in their 'shores' are generally methylated, while sites further away in the 'shelf' and those not associated with any island tend to be unmethylated. With regards to genes, sites within gene bodies and 3'UTRs tend to be unmethylated, whereas those associated with promoter regions (TSS200, TSS1500), 5'UTRs, and 1st exons are all highly methylated. The composition of flanking sequences of methylated and unmethylated sites differ for three dinucleotides (CG, CA, TG), with TG and CA are over-represented in methylated sites and CG under-represented (fig. 1 right).
 
 
-```{r fig.width=8.25, fig.height=3.5, fig.cap="Exploratory analysis of DNA methylation data: (top-left) methylation by chromosome; (top-right) presence of regulatory elements, (bottom) relation to CpG island; (right) dinucleotide frequency distribution for methylated and unmethylated CpG sites."}
+```{r eda_fig, fig.width=8.25, fig.height=3.5, fig.cap="Exploratory analysis of DNA methylation data: (top-left) methylation by chromosome; (top-right) presence of regulatory elements, (bottom) relation to CpG island; (right) dinucleotide frequency distribution for methylated and unmethylated CpG sites."}
 
 eda1
 ```
 
 ### Model selection
 
-All model selections and evaluations were performed with the sci-kit learn library.
-
-I first evaluated a basic logistic regression model (l2 norm, C=1.0) to establish a baseline for performance. This model has AUC of 0.923 in cross-validation, which is good, but a surprisingly large AUC of 0.976 on the validation set. If other more complicated models do not perform much better, we would consider this model as it is faster to train and simpler to interpret than SVM, random forest, etc., and we can find out which predictors are most important from the model coefficients.
+I first evaluated a basic logistic regression model (l2 norm, C=1.0) to establish a baseline for performance. This model has AUC of 0.923 in cross-validation and a surprisingly large AUC of 0.976 on the validation set. If other more complicated models do not perform much better, we would consider this model as it is faster to train and simpler to interpret than SVM, random forest, etc., and we can find out which predictors are most important from the model coefficients.
 
 I then tried to improve on the basic logistic regression model by tuning the logistic regression hyperparameters: models had either Lasso or Ridge regularization and penalty (C) values from a geometric distribution over 0.0001 to 1000. The best model in a random search (50 iterations) was a Lasso (l1 norm) model with C = 0.0336. had an AUC of 0.946 in 5-fold CV and 0.985 on the validation set.
 
@@ -186,13 +189,12 @@ To see if a non-linear solution was required to improve the classification perfo
 
 The best model in cross-validation had The ROC AUC was.. On the validation set, the ROC AUC ....
 
-```{r fig.width = 8, fig.height=3, fig.cap="Grid search cross-validation ROC AUC for Logistic regression (left) and SVM (right) classifiers"}
-log_reg_cv_fig + svm_cv_fig 
+```{r svm_fig, fig.width = 8.5, fig.height=3, fig.cap="Grid search cross-validation ROC AUC for Logistic regression (left) and SVM (right) classifiers"}
+log_reg_cv_fig + linear_svm_fig + svm_cv_fig 
 ```
 
-```{r}
-rf_cv_fig  
-rf2_cv_fig
+```{r rf_fig, fig.width = 8.5, fig.height=4}
+rf_cv_fig
 ```
 
 ```{r}
@@ -201,7 +203,7 @@ validation_results <-
     ~algortithm, ~roc_auc, ~accuracy, ~precision, ~recall, ~F1,
     'Random forest',       0.920, 0.938, 0.916, 0.875, 0.895,
     'Logistic regression', 0.985, 0.950, 0.909, 0.929, 0.919,
-    'SVM3',                0.936, 0.945, 0.908, 0.912, 0.910,
+    'SVM',                0.936, 0.945, 0.908, 0.912, 0.910,
   ) 
 validation_results %>% 
   kableExtra::kable(
@@ -211,7 +213,7 @@ validation_results %>%
 
 ### Model evaluation
 
-## Discussion
+
 
 ```
 >>> print(classification_report(y_validate, svm4_y_pred))
