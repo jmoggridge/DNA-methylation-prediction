@@ -521,7 +521,7 @@ svm = SVC(kernel = 'linear', random_state = 0)
 svm_pipe = Pipeline(steps = [('scaler', scaler), ('svm', svm)])
 
 # tune the C parameter over 10e-4 to 10e4
-svm_grid = {'svm__C': np.logspace(-4, 4, 40)}
+svm_grid = {'svm__C': np.logspace(-4, 1, 20)}
 # perform search
 svm_search4 = GridSearchCV(
     svm_pipe, 
@@ -534,7 +534,7 @@ svm_search4 = GridSearchCV(
 svm_search4.fit(x_train, y_train)
 
 # save the model to disk
-pickle.dump(svm_search4, open('svm_search4.sav', 'wb'))
+pickle.dump(svm_search4, open('./models/svm_search4.sav', 'wb'))
 
 # save cv results
 print("Best svm4 score (CV score=%0.3f):" % svm_search4.best_score_)
