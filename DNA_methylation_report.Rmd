@@ -11,167 +11,41 @@ knitr::opts_chunk$set(echo = F, message = F, warning = F, cache = F)
 ```
 
 ```{r plot_everything}
-library(tidyverse)
-library(patchwork)
-
-a <- read_rds("./figures/fig_islands.rds") +
-  theme(legend.position = c(.8, .9))
-b <- read_rds("./figures/fig_refgene_groups.rds") +
-  theme(legend.position = 'none')
-c <- read_rds("./figures/fig_chromosomes.rds")  +
-  theme(legend.position = 'none')
-panel_A <- ((c + b) / (a)) + plot_layout(guides = 'auto')
-panel_B <- read_rds("./figures/fig_dinucleotide.rds") +
-  theme(legend.position = 'na')
-
-eda1 <- (panel_A | panel_B )
-rm(a,b,c, panel_A, panel_B)
-
-log_reg_cv <- read_csv("./results/logreg_cv_results.csv") %>% 
-  transmute(
-    mean_fit_time,
-    C = round(param_logistic__C,5),
-    penalty = param_logistic__penalty,
-    params,
-    mean = mean_test_score,
-    sd = std_test_score
-  )
-log_reg_cv_fig <- log_reg_cv %>% 
-  filter(mean > 0.6) %>% 
-  ggplot(aes(C, mean, color = penalty, fill = penalty)) +
-  geom_path() +
-  geom_point() +
-  geom_errorbar(aes(ymin = mean - sd, ymax = mean + sd)) +
-  scale_x_log10() +
-  rcartocolor::scale_color_carto_d(palette = 1) +
-  rcartocolor::scale_fill_carto_d(palette = 1) +
-  theme_minimal() +
-  theme(legend.position = c(0.8, 0.8)) +
-  labs(y = 'AUC', x = 'C', 
-       subtitle = "Logistic regression ")
-
-# linear SVM
-svm4 <- read_csv("./results/svm4_cv_results.csv") %>% 
-  transmute(C = param_svm__C,
-            mean = mean_test_score,
-            sd = std_test_score)
-
-linear_svm_fig <- svm4 %>% 
-  ggplot(aes(C, mean)) +
-  geom_path(alpha = 0.95, color = 'gray') +
-  geom_point() +
-  geom_errorbar(aes(ymin = mean - sd, ymax = mean + sd)) +
-  scale_x_log10() +
-  labs(y = 'AUC') +
-  theme_bw()
-  
-# RBF SVM
-svm_cv <- read_csv("./results/svm_cv_results.csv")
-svm_cv2 <- read_csv("./results/svm2_cv_results.csv") 
-svm_cv3 <- read_csv("./results/svm3_cv_results.csv") %>% 
-  bind_rows(svm_cv2)%>% 
-  transmute(
-    mean_fit_time,
-    C = round(param_svm__C,5),
-    gamma = round(param_svm__gamma, 5),
-    params,
-    mean = mean_test_score,
-    std_err = std_test_score
-  ) 
-svm_cv_fig <- svm_cv3 %>% 
-  filter(mean>0.51) %>% 
-  mutate(gamma = as_factor(gamma)) %>% 
-  arrange(C) %>% 
-  ggplot(aes(x = C, y = mean, color = gamma, fill = gamma)) +
-  geom_point(alpha = 0.8, size = 0.75) +
-  geom_path(alpha = 0.8) +
-  scale_x_log10() +
-  scale_color_viridis_d(option = 'C', begin = 0.1, end = 0.92) +
-  scale_fill_viridis_d(option = 'C', begin = 0.1, end = 0.92) +
-  theme_minimal() +
-  labs(y = 'AUC', x = 'C')
-
-# Random Forest 
-
-
-rf_cv <- 
-  bind_rows(
-    read_csv("./results/rf2_cv_results.csv") %>% 
-      mutate(data=2),
-    read_csv("./results/rf_cv_results.csv") %>% 
-      mutate(
-        param_rf__min_samples_split = 2,
-        param_rf__max_depth = 99999,
-        data = 1
-      )
-  ) %>% 
-  filter(param_rf__min_samples_leaf <= 50) %>%
-  transmute(
-    estimators = factor(param_rf__n_estimators),
-    mss = factor(param_rf__min_samples_split), 
-    msl = factor(param_rf__min_samples_leaf),
-    feat = factor(param_rf__max_features),
-    max_depth = param_rf__max_depth,
-    mean = mean_test_score,
-    std_err = std_test_score,
-  ) %>% 
-  arrange(desc(mean))
-best <- rf_cv[1,]
-
-rf_cv_fig <- rf_cv %>% 
-  ggplot(aes(y = factor(estimators), x = factor(msl), fill = mean)) +
-  geom_tile() +
-  geom_point(data=best, 
-             aes(y = factor(estimators), x = factor(msl))) +
-  facet_grid(feat ~ mss, labeller = label_both) +
-  scale_fill_viridis_c(option = 'A') +
-  labs(y = 'n trees', x = 'min. samples / leaf', fill = 'AUC') +
-  theme_dark() +
-  theme(strip.background = element_blank(),
-        strip.text = element_text(color = 'black'))
-  
-  
-# 
-# rm(svm_cv, svm_cv2, svm_cv3, rf_cv, log_reg_cv)
-
+source("./DNA_methylation_figs_tables.R")
 ```
-
 
 ## Introduction
 
 DNA methylation is an epigenetic modification that is involved in regulating transcription and chromatin structure and can be influenced by environmental factors [@Schübeler2015]. Cytosine methylation at specific CpG sites is important for many physiological processes including genomic imprinting, embryonic development, and silencing of transposable elements [@Hollister2009]. Methylation patterns are inheritable but also reversible and influenced by environmental factors. Much attention has been directed towards characterizing the role of aberrant DNA methylation patterns in complex disease progression, particularly in cancer [@Vidal2017], but also for rheumatoid arthritis [@cribbs_towards_2015], neuro-degenerative disorders [@nabais_meta-analysis_2021], and others.
 
-The mapping of methylated sites across the genome can be accomplished through bisulfite sequencing, microarrays, mass spectrometry, ELISA, *etc.*. However, these methods have issues with high cost, being laborious, limited coverage, and/or high error rates [@kurdyukov2016].
-Naturally, predictive models for DNA methylation status are an attractive tool, eg. for imputing missing positions. These have already been applied using SVM, deep neural networks, random forests
+The mapping of methylated sites across the genome can be accomplished through bisulfite sequencing, microarrays, mass spectrometry, ELISA, *etc.*. However, these methods have issues with high cost, laboriousness, limited coverage, and/or high error rates [@kurdyukov2016].
+Naturally, predictive models for DNA methylation status are an attractive tool, eg. for imputing missing positions. 
 
-In this work, I sought to develop and evaluate machine learning models for the problem of predicting DNA methylation status at CpG sites. Competitions are frequently used in to compare the efforts of different research groups towards solving particular bioinformatics problems, eg. protein structure prediction (**CITE**). In keeping with this, I used a publicly available dataset of DNA methylation sites that was previously used in a Kaggle competition (<https://www.kaggle.com/c/predict-dna-methylation>) to compare my results with previous efforts. Features were generated using the flanking sequence regions using one-hot-encoding and k-mer counting approaches. For model tuning, I used 5-fold cross validation to evaluate logistic regression, support vector machines (SVM), and random forest (RF) models. The best set of hyperparameters we chosen on the basis of their receiver-operator characteristic area under the curve (AUC). Models were then used to predict the methylation status of unseen CpG sites for comparison.
+**These have already been applied using SVM, deep neural networks, random forests**
+
+In this work, I sought to develop and evaluate machine learning models for the problem of predicting DNA methylation status at CpG sites. 
+I used a publicly available dataset of DNA methylation sites that was previously used in a Kaggle competition (<https://www.kaggle.com/c/predict-dna-methylation>). Features were generated using the flanking sequence regions using one-hot-encoding and k-mer counting approaches. For model tuning, I used 5-fold cross validation to evaluate logistic regression, support vector machines (SVM), and random forest (RF) models. The best set of hyperparameters we chosen on the basis of their receiver-operator characteristic area under the curve (AUC). Models were then used to predict the methylation status of unseen CpG sites for comparison.
+
 
 ## Methods
 
-#### Dataset
+#### Dataset & Feature engineering
 
 The DNA methylation dataset used in this work was previously split into a set training of \~30k CpG sites with methylation status and an unlabeled set of 20k for predictions to be submitted for the competition. The data are comprised of positional, categorical, and DNA sequence information. As such, feature extraction must be performed to make use of the non-numeric information, especially the DNA sequences. Categorical predictors include (1) the relation to any nearby CpG island (island, north/south shelf or shore, or none); (2) location relative to genes (TSS regions, UTRs, gene body, 1st exon); (3) associated regulatory features: gene/non-gene/promoter associations & the cell-type specificity of these (T/F).
 
 The positional information include the location within the genome and the position of any nearby CpG islands. The training data is comprised entirely of sites on chromosomes 1-10 and the test data has sites from chromosomes 11-22. I extracted the distance to the nearest island (if available) and retained only this information. The exact location of sites would be too easy to memorize and would generalize to the testing set, which is on different chromosomes entirely.
 
-#### Feature extraction
-
 Two popular approaches to DNA sequence processing are to use a 'bag-of-words' approach with k-mers, or to use one-hot encoding for each position. One-hot encoding the sequence has the advantage of retaining positional information whereas k-mer counts only retain compositional (or motif) information. There is 2 kbp of sequence centered around the CpG sites included in the dataset. I used a combined approach, where I one-hot encoded the 120 bp flanking sequence and counted dinucleotides in the 2 kbp regions.
 
 #### Predictive modeling
 
-Machine learning methods were applied to the data using the popular Scikit Learn framework [@scikit-learn]. The labeled data were shuffled and partitioned into stratified subsets for 5-fold cross-validation (20%) and validation (80%). The same folds were used in each cross-validation by setting the random seed. The cross-validation procedure was performed for each of logistic regression, SVM, and RF, with a grid-search over a range of hyperparameter settings to find optimal model tuning. For logistic regression, l1 and l2 norms with varied regularization penalty strengths (C); for SVM, separate grid searches were performed with linear and radial basis function (RBF) kernels, where the C and gamma (for RBF only) hyperparameters were tuned. RF models were trained with a varied number of trees, minimum samples per split and per leaf, maximum number of features (square root of the number of predictors or 'auto'), and
-
-Best models were selected by mean AUC and fit to the full training data. Each of these was then used to predict the validation set.
-
-The best model was used to predict the competition test set.
+Machine learning methods were applied to the data using the popular Scikit Learn framework [@scikit-learn]. The labeled data were shuffled and partitioned into stratified subsets for 5-fold cross-validation (20%) and validation (80%). The same folds were used in each cross-validation by setting the random seed for each process. The cross-validation procedure was performed for each of logistic regression, SVM, and RF, with a grid-search (or random search in the case of RF) over a range of hyperparameter settings to find optimal model tuning. For logistic regression, l1 and l2 norms with varied regularization penalty strengths (C); for SVM, separate grid searches were performed with linear and radial basis function (RBF) kernels, with C and gamma (for RBF only) hyperparameter values geometrically spaced. RF models were trained in a random search with a varied number of trees, minimum samples per split and per leaf, and maximum number of features (square root of the number of predictors or 'auto'). From each search, the best model was selected by mean AUC in cross-validation and then re-fit to the full training data. Each was used to predict the outcomes of validation set and performance metrics were recorded. The model with the greatest AUC on the validation set (logistic regression) was used to predict the competition test set for submission.
 
 ## Results and Discussion
 
 ### Exploratory analysis
 
-Exploratory data analysis revealed that the categorical data for position of CpG sites in relation to CpG islands and to structural elements of genes is useful in discriminating the methylation status (fig. 1 left). 
-Sites that are within islands or in their 'shores' are generally methylated, while sites further away in the 'shelf' and those not associated with any island tend to be unmethylated. With regards to genes, sites within gene bodies and 3'UTRs tend to be unmethylated, whereas those associated with promoter regions (TSS200, TSS1500), 5'UTRs, and 1st exons are all highly methylated. The composition of flanking sequences of methylated and unmethylated sites differ for three dinucleotides (CG, CA, TG), with TG and CA are over-represented in methylated sites and CG under-represented (fig. 1 right).
+Exploratory data analysis revealed that the categorical data for position of CpG sites in relation to CpG islands and to structural elements of genes is useful in discriminating the methylation status (fig. 1 left). Sites that are within islands or in their 'shores' are generally methylated, while sites further away in the 'shelf' and those not associated with any island tend to be unmethylated. With regards to genes, sites within gene bodies and 3'UTRs tend to be unmethylated, whereas those associated with promoter regions (TSS200, TSS1500), 5'UTRs, and 1st exons are all highly methylated. The composition of flanking sequences of methylated and unmethylated sites differ for three dinucleotides (CG, CA, TG), with TG and CA are over-represented in methylated sites and CG under-represented (fig. 1 right).
 
 
 ```{r eda_fig, fig.width=8.25, fig.height=3.5, fig.cap="Exploratory analysis of DNA methylation data: (top-left) methylation by chromosome; (top-right) presence of regulatory elements, (bottom) relation to CpG island; (right) dinucleotide frequency distribution for methylated and unmethylated CpG sites."}
@@ -181,162 +55,167 @@ eda1
 
 ### Model selection
 
-I first evaluated a basic logistic regression model (l2 norm, C=1.0) to establish a baseline for performance. This model has AUC of 0.923 in cross-validation and a surprisingly large AUC of 0.976 on the validation set. If other more complicated models do not perform much better, we would consider this model as it is faster to train and simpler to interpret than SVM, random forest, etc., and we can find out which predictors are most important from the model coefficients.
+I first evaluated logistic regression models with either Lasso (L1) or Ridge (l2) regularization and penalty strength (C) values from a geometric distribution over 0.0001 to 1000 (note: smaller values are stronger). The best model in a random search (50 iterations) was a Lasso (L1 norm) model with C = 0.0336 (fig.2A); this had an AUC of 0.946 +/- 0.008 in 5-fold CV and 0.985 on the validation set.
+If other more complicated models perform similarly, we would consider selecting this model first, as it is fast to train and simple to interpret. Additional benefits of logistic regression include model coefficients that are easily interpreted, and that we can get the  probabilites for each prediction.
 
-I then tried to improve on the basic logistic regression model by tuning the logistic regression hyperparameters: models had either Lasso or Ridge regularization and penalty (C) values from a geometric distribution over 0.0001 to 1000. The best model in a random search (50 iterations) was a Lasso (l1 norm) model with C = 0.0336. had an AUC of 0.946 in 5-fold CV and 0.985 on the validation set.
-
-To see if a non-linear solution was required to improve the classification performance above 95%, I applied Radial Basis Function (rbf) kernel SVMs in 5-fold cross-validation. The hyperparameters were tuned in a random search over gamma values from ... and C values....
-
-The best model in cross-validation had The ROC AUC was.. On the validation set, the ROC AUC ....
-
-```{r svm_fig, fig.width = 8.5, fig.height=3, fig.cap="Grid search cross-validation ROC AUC for Logistic regression (left) and SVM (right) classifiers"}
-log_reg_cv_fig + linear_svm_fig + svm_cv_fig 
+```{r svm_fig, fig.width = 8, fig.height=2.5, fig.cap="Grid search cross-validation ROC AUC for Logistic regression (left) and SVM (right) classifiers"}
+(log_reg_cv_fig) + 
+  (linear_svm_fig + labs(y=NULL)) + 
+  (svm_cv_fig + labs(y=NULL))
 ```
 
-```{r rf_fig, fig.width = 8.5, fig.height=4}
-rf_cv_fig
+Support vector machines (SVM) classifiers with linear and RBF kernels were evaluated with a range of hyperparameter settings. Linear SVMs were cross-validated with C ranging from 0.0001 to 1; search was stopped here as the computation time began to explode, though it appears that we found the optimal setting. The best model of this set was found at C = 0.00695, though several other models achieved similar AUC, albeit with stronger regularization (fig. 2).  
+
+The grid search for optimal RBF tuning involved varying the gamma coefficient, which controls the radius of the influence of training examples on the support vectors. Optimal AUC was achieved with gamma = 0.00178 and C = 3.16, though many RBF classifiers with different combinations of C and gamma had similar mean AUC in cross-validation (fig. 2). Generally, models with smaller gamma with greater C performed equally well as those with a larger gamma and smaller C. This makes sense as gamma and C both control the curvature of the SVM decision boundary, such that the same bias-variance compromise can be found at different points in hyperparameter space.
+
+As random forest classifiers have many hyperparameters, a random search was performed to reduce computation time. Performance of RF models tended to be greater with a greater number of trees in the ensemble and a smaller minimum number of samples per leaf (fig. 3). The number of samples per split and the maximum number of features did not seem to affect AUC over the search range. Optimal AUC (0.924 +/- 0.008) was found with 50 trees, 20 samples per split, 1 sample per leaf and automatic maximum features thresholds.
+
+```{r rf_fig, fig.width = 5, fig.height=3, fig.cap="ROC AUC of random forest models from random search with 5-fold CV. Subplots are separated by minimum samples per split (mss; top labels) and maximum number of features (feat; right labels)"}
+rf_cv_fig 
 ```
+
+### Model validation and testing
+
+The best performing models of each type were re-fit to the entire training set (~8k examples) used to predict an unseen validation set of ~24k. The logistic regression model was most succesful
 
 ```{r}
-validation_results <- 
-  tribble(
-    ~algortithm, ~roc_auc, ~accuracy, ~precision, ~recall, ~F1,
-    'Random forest',       0.920, 0.938, 0.916, 0.875, 0.895,
-    'Logistic regression', 0.985, 0.950, 0.909, 0.929, 0.919,
-    'SVM',                0.936, 0.945, 0.908, 0.912, 0.910,
-  ) 
-validation_results %>% 
-  kableExtra::kable(
-    caption = "Performance metrics of best models in validation set prediction."
-    )
+table1
 ```
 
-### Model evaluation
 
 
-
-```
->>> print(classification_report(y_validate, svm4_y_pred))
-              precision    recall  f1-score   support
-
-           0       0.96      0.95      0.96     16194
-           1       0.89      0.91      0.90      7058
-
-    accuracy                           0.94     23252
-   macro avg       0.93      0.93      0.93     23252
-weighted avg       0.94      0.94      0.94     23252
-
-[[15438   756]
- [  624  6434]]
-
-Test performance of svm_linear model
-  algortithm   roc_auc  accuracy  precision   recall        F1
-
-    * it used the smallest gamma value and medium in C
-    Best SVM score (CV score=0.933):
-    Best SVM parameters: {'svm__gamma': 0.001, 'svm__C': 1.0}
-
-                  precision    recall  f1-score   support
-
-               0       0.96      0.96      0.96     16194
-               1       0.90      0.91      0.90      7058
-
-        accuracy                           0.94     23252
-       macro avg       0.93      0.93      0.93     23252
-    weighted avg       0.94      0.94      0.94     23252
-
-    [[15496   698]
-     [  653  6405]]
-
-    Test performance of SVM model
-      algortithm   roc_auc  accuracy  precision    recall        F1
-    0        SVM  0.932189  0.941897   0.901732  0.907481  0.904597
+The best logistic regression model was used to predict the methylation status of the test set. Upon submission to the competition, it was found that the model had an accuracy of 0.947.
 
 
-
-    Best svm3 score (CV score=0.934)
-    Best svm3 parameters:
-    {'svm__C': 12.915496650148826, 'svm__gamma': 0.0013894954943731374}
-
-                  precision    recall  f1-score   support
-
-               0       0.96      0.96      0.96     16194
-               1       0.91      0.91      0.91      7058
-
-        accuracy                           0.95     23252
-       macro avg       0.93      0.94      0.94     23252
-    weighted avg       0.95      0.95      0.95     23252
-
-    [[15538   656]
-     [  618  6440]]
-
-    Test performance of svm3 model
-
-      algortithm   roc_auc  accuracy  precision   recall       F1
-    0       SVM3  0.935965  0.945209   0.907554  0.91244  0.90999
-
-
-
-    Best RF score (CV score=0.915):
-    Best RF params
-    {'rf__n_estimators': 200, 'rf__min_samples_leaf': 10, 
-    'rf__max_features': 'auto', 'rf__bootstrap': True}
-
-
-                  precision    recall  f1-score   support
-
-               0       0.94      0.96      0.95     16194
-               1       0.91      0.87      0.89      7058
-
-        accuracy                           0.93     23252
-       macro avg       0.93      0.92      0.92     23252
-    weighted avg       0.93      0.93      0.93     23252
-
-    [[15589   605]
-     [  932  6126]]
-
-          algortithm   roc_auc  accuracy  precision    recall        F1
-    0  Random forest  0.915296  0.933898   0.910117  0.867951  0.888534
-
-    Best RF2 score (CV score=0.924):
-    {'rf__n_estimators': 50, 'rf__min_samples_split': 20, 'rf__min_samples_leaf': 1, 'rf__max_features': 'auto', 'rf__max_depth': 100}
-                  precision    recall  f1-score   support
-
-               0       0.95      0.97      0.96     16194
-               1       0.92      0.88      0.90      7058
-
-        accuracy                           0.94     23252
-       macro avg       0.93      0.92      0.93     23252
-    weighted avg       0.94      0.94      0.94     23252
-
-    [[15630   564]
-     [  882  6176]]
-
-            algortithm   roc_auc  accuracy  precision    recall        F1
-    0  Random forest 2  0.920104  0.937812    0.91632  0.875035  0.895202
-
-    Best score (ROC AUC=0.946)
-    'logistic__solver': 'liblinear', 
-    'logistic__penalty': 'l1', 
-    'logistic__C': 0.03359818286283781
-
-                  precision    recall  f1-score   support
-
-               0       0.97      0.96      0.96     16194
-               1       0.91      0.93      0.92      7058
-
-        accuracy                           0.95     23252
-       macro avg       0.94      0.94      0.94     23252
-    weighted avg       0.95      0.95      0.95     23252
-
-
-    [[15534   660]
-     [  502  6556]]
-
-    Test performance of Logistic regression model   
-              algortithm  roc_auc  accuracy  precision    recall        F1
-     Logistic regression  0.98546  0.950026   0.908537  0.928875  0.918593
-
-<!-- Beta 0= unmethylated, Beta 1=methylated) -->
 
 ## References
+
+
+
+
+
+<!-- ``` -->
+<!-- >>> print(classification_report(y_validate, svm4_y_pred)) -->
+<!--               precision    recall  f1-score   support -->
+
+<!--            0       0.96      0.95      0.96     16194 -->
+<!--            1       0.89      0.91      0.90      7058 -->
+
+<!--     accuracy                           0.94     23252 -->
+<!--    macro avg       0.93      0.93      0.93     23252 -->
+<!-- weighted avg       0.94      0.94      0.94     23252 -->
+
+<!-- [[15438   756] -->
+<!--  [  624  6434]] -->
+
+<!-- Test performance of svm_linear model -->
+<!--   algortithm   roc_auc  accuracy  precision   recall        F1 -->
+
+<!--     * it used the smallest gamma value and medium in C -->
+<!--     Best SVM score (CV score=0.933): -->
+<!--     Best SVM parameters: {'svm__gamma': 0.001, 'svm__C': 1.0} -->
+
+<!--                   precision    recall  f1-score   support -->
+
+<!--                0       0.96      0.96      0.96     16194 -->
+<!--                1       0.90      0.91      0.90      7058 -->
+
+<!--         accuracy                           0.94     23252 -->
+<!--        macro avg       0.93      0.93      0.93     23252 -->
+<!--     weighted avg       0.94      0.94      0.94     23252 -->
+
+<!--     [[15496   698] -->
+<!--      [  653  6405]] -->
+
+<!--     Test performance of SVM model -->
+<!--       algortithm   roc_auc  accuracy  precision    recall        F1 -->
+<!--     0        SVM  0.932189  0.941897   0.901732  0.907481  0.904597 -->
+
+
+
+<!--     Best svm3 score (CV score=0.934) -->
+<!--     Best svm3 parameters: -->
+<!--     {'svm__C': 12.915496650148826, 'svm__gamma': 0.0013894954943731374} -->
+
+<!--                   precision    recall  f1-score   support -->
+
+<!--                0       0.96      0.96      0.96     16194 -->
+<!--                1       0.91      0.91      0.91      7058 -->
+
+<!--         accuracy                           0.95     23252 -->
+<!--        macro avg       0.93      0.94      0.94     23252 -->
+<!--     weighted avg       0.95      0.95      0.95     23252 -->
+
+<!--     [[15538   656] -->
+<!--      [  618  6440]] -->
+
+<!--     Test performance of svm3 model -->
+
+<!--       algortithm   roc_auc  accuracy  precision   recall       F1 -->
+<!--     0       SVM3  0.935965  0.945209   0.907554  0.91244  0.90999 -->
+
+
+
+<!--     Best RF score (CV score=0.915): -->
+<!--     Best RF params -->
+<!--     {'rf__n_estimators': 200, 'rf__min_samples_leaf': 10,  -->
+<!--     'rf__max_features': 'auto', 'rf__bootstrap': True} -->
+
+
+<!--                   precision    recall  f1-score   support -->
+
+<!--                0       0.94      0.96      0.95     16194 -->
+<!--                1       0.91      0.87      0.89      7058 -->
+
+<!--         accuracy                           0.93     23252 -->
+<!--        macro avg       0.93      0.92      0.92     23252 -->
+<!--     weighted avg       0.93      0.93      0.93     23252 -->
+
+<!--     [[15589   605] -->
+<!--      [  932  6126]] -->
+
+<!--           algortithm   roc_auc  accuracy  precision    recall        F1 -->
+<!--     0  Random forest  0.915296  0.933898   0.910117  0.867951  0.888534 -->
+
+<!--     Best RF2 score (CV score=0.924): -->
+<!--     {'rf__n_estimators': 50, 'rf__min_samples_split': 20, 'rf__min_samples_leaf': 1, 'rf__max_features': 'auto', 'rf__max_depth': 100} -->
+<!--                   precision    recall  f1-score   support -->
+
+<!--                0       0.95      0.97      0.96     16194 -->
+<!--                1       0.92      0.88      0.90      7058 -->
+
+<!--         accuracy                           0.94     23252 -->
+<!--        macro avg       0.93      0.92      0.93     23252 -->
+<!--     weighted avg       0.94      0.94      0.94     23252 -->
+
+<!--     [[15630   564] -->
+<!--      [  882  6176]] -->
+
+<!--             algortithm   roc_auc  accuracy  precision    recall        F1 -->
+<!--     0  Random forest 2  0.920104  0.937812    0.91632  0.875035  0.895202 -->
+
+<!--     Best score (ROC AUC=0.946) -->
+<!--     'logistic__solver': 'liblinear',  -->
+<!--     'logistic__penalty': 'l1',  -->
+<!--     'logistic__C': 0.03359818286283781 -->
+
+<!--                   precision    recall  f1-score   support -->
+
+<!--                0       0.97      0.96      0.96     16194 -->
+<!--                1       0.91      0.93      0.92      7058 -->
+
+<!--         accuracy                           0.95     23252 -->
+<!--        macro avg       0.94      0.94      0.94     23252 -->
+<!--     weighted avg       0.95      0.95      0.95     23252 -->
+
+
+<!--     [[15534   660] -->
+<!--      [  502  6556]] -->
+
+<!--     Test performance of Logistic regression model    -->
+<!--               algortithm  roc_auc  accuracy  precision    recall        F1 -->
+<!--      Logistic regression  0.98546  0.950026   0.908537  0.928875  0.918593 -->
+
+<!-- <!-- Beta 0= unmethylated, Beta 1=methylated) --> -->
+
+<!-- ## References -->

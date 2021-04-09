@@ -2,7 +2,6 @@ library(tidyverse)
 library(patchwork)
 
 meth <- read_csv("data/train.csv")
-
 meth <- meth %>% 
   transmute(
     chromosome = CHR,
@@ -50,7 +49,6 @@ rm(fig2)
 
 
 meth <- read_csv("data/train.csv")
-
 meth <- meth %>% 
   transmute(
     Id = Id,
