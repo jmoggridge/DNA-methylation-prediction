@@ -7,7 +7,7 @@ bibliography: references.bib
 ---
 
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = F, message = F, warning = F, cache = F)
+knitr::opts_chunk$set(echo = F, message = F, warning = F, cache = T)
 ```
 
 ```{r plot_everything}
@@ -38,7 +38,7 @@ Two popular approaches to DNA sequence processing are to use a 'bag-of-words' ap
 
 Machine learning methods were applied using the popular Scikit Learn framework in Python [@scikit-learn]. The labeled data were shuffled and partitioned into stratified subsets for training (*i*20%) and validation (80%). 5-fold cross-validation (CV) used the same data splits for each type of model and with scaling occurring within folds to not allow information leakage. CV was performed in grid-searches over a range of hyperparameter settings to find optimal model tuning (or random search in the case of RF) . For logistic regression, l1 and l2 norms were explored with an geometric series regularization penalty strengths (C); for SVM, separate grid searches were performed with linear and radial basis function (RBF) kernels, with C and gamma (for RBF only) values varied. RF models were fit with a varied number of trees, minimum samples per split and per leaf, and maximum number of features (square root of the number of predictors or 'auto'). From each search, the best model was selected by mean AUC in CV and then re-fit to the full training data. Each 'best' model was used to predict the statuses of the validation set and performance metrics were recorded. The model with the greatest AUC on the validation set (spoiler: logistic regression) was used to predict the competition test set for submission.
 
-## Results and Discussion
+## Results
 
 ### Exploratory analysis
 
@@ -49,9 +49,9 @@ Exploratory data analysis revealed that the categorical data for position of CpG
 eda1
 ```
 
-### Model selection
+### Model tuning and selection
 
-I first evaluated logistic regression models with either Lasso (L1) or Ridge (l2) regularization and penalty strength (C) values from a geometric distribution over 0.0001 to 1000 (note: smaller values are stronger). The best model in a random search (50 iterations) was a Lasso (L1 norm) model with C = 0.0336 (fig.2A); this had an AUC of 0.946 +/- 0.008 in 5-fold CV and 0.985 on the validation set. If other more complicated models perform similarly, we would consider selecting this model first, as it is fast to train and simple to interpret. Additional benefits of logistic regression include model coefficients that are easily interpreted, and that we can get the probabilites for each prediction.
+Logistic regression models that were evaluated by CV used either Lasso (L1) or Ridge (l2) regularization and had penalty strength (C) values from a geometric distribution ranging from 0.0001 to 1000 (note: smaller values are stronger here). The best model in a random search (50 iterations) was a Lasso (L1 norm) model with C = 0.0336 (fig.2A); this had an AUC of 0.946 +/- 0.008 in 5-fold CV and 0.985 on the validation set. If other more complicated models perform similarly, we would consider selecting this model first, as it is fast to train and simple to interpret. Additional benefits of logistic regression include model coefficients that are easily interpreted, and that we can get the probabilities for each prediction.
 
 ```{r svm_fig, fig.width = 8, fig.height=2.5, fig.cap="Grid search cross-validation ROC AUC for Logistic regression (left) and SVM (right) classifiers"}
 (log_reg_cv_fig) + 
@@ -80,17 +80,23 @@ ttest_table %>%
 
 ### Model validation and testing
 
-The best performing models of each type were re-fit to the entire training set (\~8k examples) and then used to predict an unseen validation set of \~24k. The logistic regression model was the most successful in terms of AUC (0.985), accuracy (0.950), recall (0.929), and F1 score (0.919). However, the random forest model had greater precision (0.916) than the logistic regression model. The best logistic regression model was used to predict the methylation status of the test set of \~20k CpG sites. Upon submission, it was revealed that the model had an accuracy of 0.947 on the test set. Unfortunately, there was no record of the competition scores to make a comparison, but my result is similar in accuracy to ... by [@Zhang2015]
+The best performing models of each type were re-fit to the entire training set (\~8k examples) and then used to predict an unseen validation set of \~24k. The logistic regression model was the most successful in terms of AUC (0.985), accuracy (0.950), recall (0.929), and F1 score (0.919). However, the random forest model had greater precision (0.916) than the logistic regression model. The best logistic regression model was used to predict the methylation status of the test set of \~20k CpG sites. Upon submission, it was revealed that the model had an accuracy of 0.947 on the test set. Unfortunately, there was no record of the competition scores to make a comparison, but my result is similar in accuracy to those of [@Zhang2015], where the dataset used similar information about relation to CpG islands and gene regulatory features.
 
 ```{r}
 final_table
 ```
 
-The accuracy of the classifiers overall was quite high; with optimal tuning each of the LR, SVM, and RF models were able to reach AUC of 0.9. This indicates that a large proportion of the CpG sites are relatively easy to predict, as many models can understand these. Perhaps this is in part because methylation corresponds well with the nominal data relating to CpG islands, genes, and regulatory features.
+## Discussion
+
+The accuracy of the classifiers overall was quite high; with optimal tuning each of the LR, SVM, and RF models were able to reach AUC of 0.9. Similar performance was possible with logistic regression models with very weak regularization despite their proneness to overfitting. The ease with which 90% accuracy could be reached indicates that a very large proportion of the CpG sites are relatively easy to predict. Perhaps this is in part because methylation status is correlated with the nominal data relating to CpG islands, genes, and regulatory features, as well several of the dinucleotide frequencies (fig. 1).
 
 \*\*Variable importance of the logistic regression model\*\*
 
+Further effort in feature engineering would likely improve the predictive strength of the models. Specifically, increasing the size of $k$ for $k$-mer counts, *eg.* from 2 to 6 or more, should provide additional useful information about the composition of the flanking sequence. However, the large number of predictors ($4^k$) would greatly impact time and resource consumption for model evaluation for what may be only a small increase in accuracy.
+
 The one-hot-encoded region may not provide much information for the number of dimensions added to the data.
+
+It remains unknown whether all sites can be predicted with certainty or whether the biological variability of DNA methylation may mean that some sites will be particularly difficult to resolve. The dataset used in this work has some peculiar qualities that may not be ideal for model development. The splitting of training and test data by different chromosomes renders much of the positional data useless and also denies the possibility of using information about neighboring CpG sites. Additionally, the datasets contains mainly unmethylated sites, especially in CpG islands, whereas the majority of sites across the genome are methylated and CpG islands only account for \~1-2% of the genome. Since the training data are not reflective, the accuracy models created here would likely suffer in a whole-genome context.
 
 The process of developing predictive models involves many trade-offs. Improved performance can generally be accomplished by increasing the amount of training data, or by extending model selections and hyper-parameter searches. Adding more training data or optimizing model tuning should increase accuracy (up to a point) but increases the cost in time and computational resources. Similarly, increasing
 

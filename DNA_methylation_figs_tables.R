@@ -253,8 +253,9 @@ validation_results <-
   full_join(cv_results, by = 'name') %>% 
   rename(Classifier = name)
 
-write_rds("./results/validation_performance_results.rds")
-final_table <- full_results %>% 
+write_rds(validation_results, "./results/validation_performance_results.rds")
+
+final_table <- validation_results %>% 
   arrange(desc(AUC)) %>% 
   kableExtra::kable(
     caption = "Performance metrics of best models in validation set prediction."
@@ -322,6 +323,11 @@ ttest_table <-
          ) %>% 
   select(-contains('scores'), -t_test)
 
+
+rm(logreg, rf, svm, generate_kmer_features, paired_t_test, best,
+   best_linear_svm, best_logreg, best_rf, best_rbf_svm, cv_results,
+   log_reg_cv, log_reg_cv_fig, meth, meth_longseq_kmers, svm2, svm3, svm4,
+   rf_cv, svm_cv, svm_cv2, svm_cv_fig, linear_svm_fig, rf_cv_fig)
 
 
 
