@@ -3,18 +3,120 @@
 library(tidyverse)
 library(patchwork)
 
-a <- read_rds("./figures/fig_islands.rds") +
-  theme(legend.position = c(.8, .9))
-b <- read_rds("./figures/fig_refgene_groups.rds") +
-  theme(legend.position = 'none')
-c <- read_rds("./figures/fig_chromosomes.rds")  +
-  theme(legend.position = 'none')
-panel_A <- ((c + b) / (a)) + plot_layout(guides = 'auto')
-panel_B <- read_rds("./figures/fig_dinucleotide.rds") +
-  theme(legend.position = 'na')
+meth <- read_csv("data/train.csv")
+meth <- meth %>% 
+  transmute(
+    chromosome = CHR,
+    island = Relation_to_UCSC_CpG_Island,
+    feature = Regulatory_Feature_Group,
+    methylated = ifelse(Beta==1, 'methylated', 'unmethylated')
+  )
+meth <- meth %>% 
+  mutate(across(everything(),
+                ~ ifelse(is.na(.x), 'None', .x)))
 
-eda1 <- (panel_A | panel_B )
-rm(a,b,c, panel_A, panel_B)
+fig1 <- meth %>% 
+  group_by(island, methylated) %>% 
+  count() %>% 
+  ggplot(aes(n, island, fill= methylated, color = methylated)) +
+  geom_col() +
+  rcartocolor::scale_color_carto_d(palette = 2) +
+  rcartocolor::scale_fill_carto_d(palette = 2) +
+  theme_minimal() +
+  theme(legend.position = c(.8, .9)) +
+  labs(subtitle = 'Relation to CpG island',
+       x = '', y ='', color = '', fill = '')
+
+fig2 <- meth %>% 
+  mutate(chromosome = as_factor(chromosome)) %>% 
+  select(-island, -feature) %>% 
+  group_by(chromosome) %>% 
+  mutate(total_sites = n()) %>% 
+  group_by(chromosome, methylated) %>% 
+  mutate(proportion = n()/total_sites) %>% 
+  distinct() %>% 
+  ggplot(aes(chromosome, proportion, fill = methylated)) +
+  geom_col() +
+  rcartocolor::scale_fill_carto_d(palette = 2) +
+  labs(y = 'proportion of sites', fill = '') +
+  theme_minimal() +
+  theme(legend.position = 'none')
+
+meth <- read_csv("data/train.csv")
+fig3 <- meth %>% 
+  transmute(
+    Id = Id,
+    chromosome = CHR,
+    UCSC_RefGene_Group,
+    methylated = ifelse(Beta==1, 'methylated', 'unmethylated')
+  ) %>% 
+  mutate(across(everything(), ~ ifelse(is.na(.x), 'None', .x))) %>% 
+  mutate(terms = map(UCSC_RefGene_Group, ~str_split(.x, ';'))) %>% 
+  unnest(terms) %>% 
+  unnest(terms) %>% 
+  group_by(Id, terms) %>% 
+  distinct() %>% 
+  count(methylated) %>% 
+  ggplot(aes(y = terms, x = n, fill = methylated)) +
+  geom_col() +
+  rcartocolor::scale_fill_carto_d(palette = 2) +
+  theme_minimal() +
+  theme(legend.position = 'null') +
+  labs(subtitle = 'RefGene tags', x = 'n CpG sites', y='', fill ='')
+
+
+panel_A <- ((fig2 + fig3) / (fig1)) + plot_layout(guides = 'auto')
+
+
+
+# dinucleotide composition graph workflow
+
+meth <- read_csv("./data/train.csv")
+meth <- meth %>% transmute(
+  Id, 
+  Forward_Sequence,
+  seq,
+  methylated = ifelse(Beta==1, 'methylated', 'unmethylated'),
+  island = Relation_to_UCSC_CpG_Island
+)
+
+
+# function generates sequence feature columns [(1-4)-mers] for classification
+generate_kmer_features <- function(df){
+  df <- as.data.frame(df)
+  df$seq <- Biostrings::DNAStringSet(df$seq)
+  features.df <- df %>%
+    cbind(Biostrings::dinucleotideFrequency(df$seq, as.prob = TRUE)) %>%
+    dplyr::select(-seq) 
+  return(features.df)
+}
+
+# select dinucleotides only
+meth_longseq_kmers <- meth %>% 
+  generate_kmer_features() %>% 
+  select(methylated, AA:TT)
+
+# plot distributions of each dinucleotide
+fig4 <- meth_longseq_kmers %>% 
+  pivot_longer(AA:TT, names_to = 'dinucleotide',
+               values_to = 'prop') %>% 
+  ggplot(aes(x = prop*100, color = methylated, fill = methylated)) +
+  geom_density(alpha = 0.1) +
+  facet_wrap(~ dinucleotide) +
+  rcartocolor::scale_fill_carto_d(palette = 2) +
+  rcartocolor::scale_color_carto_d(palette = 2) +
+  labs(x= '% composition', color ='', fill = '', 
+       subtitle = "DNA composition over 2 kbp around CpG sites") +
+  theme_minimal() +
+  xlim(0, 15) +
+  theme(panel.grid = element_blank(), 
+        axis.text.y.left = element_blank(),
+        axis.line.y = element_blank())
+
+
+eda1 <- (panel_A | fig4 )
+
+rm(panel_A, fig1, fig2, fig3, fig4)
 
 log_reg_cv <- read_csv("./results/logreg_cv_results.csv") %>% 
   transmute(
@@ -145,10 +247,12 @@ validation_results <-
     'Linear SVM',          0.932, 0.941, 0.895, 0.912, 0.903,
     'Random forest',       0.920, 0.938, 0.916, 0.875, 0.895,
   )
+
 full_results <- 
   full_join(cv_results, validation_results, by = 'name') %>% 
   rename(Classifier = name)
 table1 <- full_results %>% 
+  arrange(desc(AUC)) %>% 
   kableExtra::kable(
     caption = "Performance metrics of best models in validation set prediction."
   )
@@ -157,14 +261,15 @@ table1 <- full_results %>%
 
 
 
-## Paired t-test
+## Paired t-tests
+
+# first need to parse the split data from each cv results, get vector for each.
 
 logreg <- read_csv("./results/logreg_cv_results.csv") %>% 
   filter(mean_test_score == max(mean_test_score)) %>% 
   select(contains('split')) %>%
   pivot_longer(everything()) %>% 
   pull(value)
-logreg 
 
 svm3 <- read_csv("./results/svm_cv_results.csv")
 svm2 <- read_csv("./results/svm2_cv_results.csv") 
@@ -174,21 +279,17 @@ svm <- read_csv("./results/svm3_cv_results.csv") %>%
   select(contains('split')) %>%
   pivot_longer(everything()) %>% 
   pull(value)
-svm  
 
 lin_svm <- read_csv("./results/svm4_cv_results.csv") %>% 
   filter(mean_test_score == max(mean_test_score)) %>% 
   select(contains('split')) %>%
   pivot_longer(everything()) %>% 
   pull(value)
-lin_svm
 
 rf <-  
   bind_rows(
-    read_csv("./results/rf2_cv_results.csv") %>% 
-      mutate(data=2),
-    read_csv("./results/rf_cv_results.csv") %>% 
-      mutate(data = 1)
+    read_csv("./results/rf_cv_results.csv") %>%  mutate(data = 1),
+    read_csv("./results/rf2_cv_results.csv") %>% mutate(data = 2)
   ) %>% 
   filter(mean_test_score == max(mean_test_score)) %>% 
   select(contains("test_score")) %>% 
@@ -196,9 +297,34 @@ rf <-
   pivot_longer(everything()) %>% 
   pull(value)
 
-rf
+paired_t_test <- function(x,y) t.test(unlist(x), unlist(y), paired=T)
 
-t.test(logreg, svm, paired = T)
+# make df with columns of the 5 split scores for pairs of models
+ttest_table <- 
+  tribble(
+    ~`Model 1`, ~scores1, ~`Model 2`, ~scores2,
+    "Logistic regression", logreg, "RBF SVM", svm,
+    "Logistic regression", logreg,  "Linear SVM", lin_svm,
+    "Logistic regression", logreg, "Random forest", rf,
+    "RBF SVM", svm, "Linear SVM", lin_svm,
+    "RBF SVM", svm, "Random forest", rf,
+    "Linear SVM", lin_svm, "Random forest", rf,
+  ) %>% 
+  # perform paired t-test
+  mutate(t_test = map2(scores1, scores2, paired_t_test),
+         `Mean difference` = map_dbl(t_test, "estimate"),
+         `Mean difference` = round(`Mean difference`, 3),
+         `p-value` = map_dbl(t_test, "p.value"),
+         `p-value` = round(`p-value`, 3)
+         ) %>% 
+  select(-contains('scores'), -t_test)
+
+
+
+
+
+
+
 
 
 

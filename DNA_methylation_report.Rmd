@@ -74,9 +74,19 @@ As random forest classifiers have many hyperparameters, a random search was perf
 rf_cv_fig 
 ```
 
+Paired t-tests of the AUC scores from the best models of each type showed that the logistic regression classifier performed significantly better than the linear and RBF SVM and RF models (p<0.05). Additionally, the linear and RBF SVM classifiers performed significantly better than the random forest model, but the difference between the two SVM classifiers was not significant.
+
+```{r}
+ttest_table %>% 
+  kableExtra::kable(
+    format= 'simple',
+    caption = "Paired t-tests of the AUC scores of the best models of each type in 5-fold cross-validation.")
+```
+
+
 ### Model validation and testing
 
-The best performing models of each type were re-fit to the entire training set (~8k examples) used to predict an unseen validation set of ~24k. The logistic regression model was most succesful
+The best performing models of each type were re-fit to the entire training set (~8k examples) used to predict an unseen validation set of ~24k. The logistic regression model was most successful of the bunch in terms of AUC (0.985), accuracy (0.950), recall (0.929), and F1 score (0.919). The random forest model had greater precision (0.916) than the logistic regression model
 
 ```{r}
 table1
