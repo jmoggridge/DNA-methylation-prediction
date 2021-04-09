@@ -71,7 +71,7 @@ rf_cv_fig
 
 Paired t-tests of the AUC scores from the best models of each type showed that the logistic regression classifier performed significantly better than the linear and RBF SVM and RF models (p\<0.05). Additionally, the linear and RBF SVM classifiers performed significantly better than the random forest model, but the difference between the two SVM classifiers was not significant.
 
-```{r}
+```{r ttest_table}
 ttest_table %>% 
   kableExtra::kable(
     format= 'simple',
@@ -82,29 +82,44 @@ ttest_table %>%
 
 The best performing models of each type were re-fit to the entire training set (\~8k examples) and then used to predict an unseen validation set of \~24k. The logistic regression model was the most successful in terms of AUC (0.985), accuracy (0.950), recall (0.929), and F1 score (0.919). However, the random forest model had greater precision (0.916) than the logistic regression model. The best logistic regression model was used to predict the methylation status of the test set of \~20k CpG sites. Upon submission, it was revealed that the model had an accuracy of 0.947 on the test set. Unfortunately, there was no record of the competition scores to make a comparison, but my result is similar in accuracy to those of [@Zhang2015], where the dataset used similar information about relation to CpG islands and gene regulatory features.
 
-```{r}
-final_table
+```{r final_table}
+final_table %>% 
+  kableExtra::kable(
+    format = 'simple',
+    caption = "Performance metrics of best models in validation set prediction."
+  )
+
+```
+
+### Variable importance
+
+The coefficients of the selected logistic regression model were extracted to examine which factors have the most influence on the predictions (fig 4). Of the regulatory feature categories, promoter-associated, non-gene associated and unclassified sites were all more likely to be unmethylated; however, cell-type specificity of these was related with methylation. Of the gene elements, the presence of transcription start sites (TSS), 5'UTRs, and 1st exons lead to classification of sites as unmethylated, whereas proximity to gene-body and 3'UTRs meant a site was more likely to be methylated.
+
+A greater frequency of CG, TA, TT, and AA dinucleotides meant that sites were more likely to be unmethlyated, whereas more TG and CA indicated methylation. Presence of certain bases in close proximity to CpG sites also had a large influence on prediction of methylation status; here the position of the CpG site itself is arbitrarily set as 60, such that X59 represents the -1 position and X61 the +1 position relative to the site. The dummy variables A59, T58, T64, A55 indicated a site was less likely to be methylated, whereas A61, C59, and G62 were positive predictors of methylation.
+
+Location in relation to CpG islands was generally important for the 'island' category but less so if the site was associated with an island's shore or shelf. Interestingly, a greater distance from the start (dist_start) of the nearest CpG island was linked with methylation while a greater distance to the end of the nearest island (dist_end) was linked with unmethylation; these coefficients were smaller than many of the categorical and sequence-derived features though.
+
+```{r var_imp_fig, fig.height=5, fig.width=4, fig.cap="Coefficients of the 30 most influential predictors in the selected Lasso logistic regression model. Features include dinucleotides (eg. cg); one-hot-encoded sequence positions (eg. A59); association with regulatory elements or portions of genes. "}
+VI_fig
 ```
 
 ## Discussion
 
-The accuracy of the classifiers overall was quite high; with optimal tuning each of the LR, SVM, and RF models were able to reach AUC of 0.9. Similar performance was possible with logistic regression models with very weak regularization despite their proneness to overfitting. The ease with which 90% accuracy could be reached indicates that a very large proportion of the CpG sites are relatively easy to predict. Perhaps this is in part because methylation status is correlated with the nominal data relating to CpG islands, genes, and regulatory features, as well several of the dinucleotide frequencies (fig. 1).
+The accuracy of the classifiers overall was quite high; with optimal tuning parameters, each of the LR, SVM, and RF models were able to obtain an AUC of 0.9. Similar performance was possible with logistic regression models with very weak regularization despite their proneness to over-fitting. The ease with which 90% accuracy could be reached indicates that a very large proportion of the CpG sites are relatively easy to predict. Perhaps this is in part because methylation status is correlated with the nominal data relating to CpG islands, genes, and regulatory features, as well several of the dinucleotide frequencies (fig. 1).
 
-\*\*Variable importance of the logistic regression model\*\*
+One of the benefits of the Lasso logistic regression model is that coefficients are regularized by the L1 norm, causing shrinkage of unimportant predictors to zero [@james2013b]. Indeed, only 205 of the 515 predictors had non-zero coefficients in the best model. The sign and size of these coefficients indicates whether these features are associated with methylated or unmethylated sites and to what degree (fig. 4). Features derived from categorical data pertaining to regulatory and gene elements were highly influential, while the categorization of sites relative to CpG islands was less useful when sites were not within an island; the distance-based relation to CpG islands taken here may be more suitable for providing such information about the site. In further developing predictive models for CpG methylation, it may be worthwhile to incorporate further categorical information about regulatory and coding sequences in proximity to the sites.
+
+The frequencies of particular dinucleotides in the 2 kbp flanking region were among the most influential of all predictors, while the presence of certain residues immediately adjacent to the CpG site generally had a greater impact than distant residues. Taken together, this suggests that the feature engineering undertaken prior to modeling generated much useful information for the prediction of methylation status.
 
 Further effort in feature engineering would likely improve the predictive strength of the models. Specifically, increasing the size of $k$ for $k$-mer counts, *eg.* from 2 to 6 or more, should provide additional useful information about the composition of the flanking sequence. However, the large number of predictors ($4^k$) would greatly impact time and resource consumption for model evaluation for what may be only a small increase in accuracy.
 
-The one-hot-encoded region may not provide much information for the number of dimensions added to the data.
+The one-hot-encoding region may not provide much information for the number of dimensions added to the data.
 
 It remains unknown whether all sites can be predicted with certainty or whether the biological variability of DNA methylation may mean that some sites will be particularly difficult to resolve. The dataset used in this work has some peculiar qualities that may not be ideal for model development. The splitting of training and test data by different chromosomes renders much of the positional data useless and also denies the possibility of using information about neighboring CpG sites. Additionally, the datasets contains mainly unmethylated sites, especially in CpG islands, whereas the majority of sites across the genome are methylated and CpG islands only account for \~1-2% of the genome. Since the training data are not reflective, the accuracy models created here would likely suffer in a whole-genome context.
 
 The process of developing predictive models involves many trade-offs. Improved performance can generally be accomplished by increasing the amount of training data, or by extending model selections and hyper-parameter searches. Adding more training data or optimizing model tuning should increase accuracy (up to a point) but increases the cost in time and computational resources. Similarly, increasing
 
 More complex models can yield better predictions more difficult, non-linear problems, but this again comes at a cost. With a new problem, it is often difficult to know how to balance this time-performance compromise in the model selection process.
-
-process.
-
-pAs there is
 
 ## References
 

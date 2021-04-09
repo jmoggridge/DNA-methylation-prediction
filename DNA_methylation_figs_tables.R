@@ -256,11 +256,7 @@ validation_results <-
 write_rds(validation_results, "./results/validation_performance_results.rds")
 
 final_table <- validation_results %>% 
-  arrange(desc(AUC)) %>% 
-  kableExtra::kable(
-    caption = "Performance metrics of best models in validation set prediction."
-  )
-
+  arrange(desc(AUC)) 
 
 
 
@@ -326,8 +322,26 @@ ttest_table <-
 
 rm(logreg, rf, svm, generate_kmer_features, paired_t_test, best,
    best_linear_svm, best_logreg, best_rf, best_rbf_svm, cv_results,
-   log_reg_cv, log_reg_cv_fig, meth, meth_longseq_kmers, svm2, svm3, svm4,
-   rf_cv, svm_cv, svm_cv2, svm_cv_fig, linear_svm_fig, rf_cv_fig)
+   log_reg_cv, meth, meth_longseq_kmers, svm2, svm3, svm4,
+   rf_cv, svm_cv, svm_cv2)
+
+
+
+
+VI_fig <- read_csv("./results/LR_variable_importance.csv") %>% 
+  filter(coefficient != 0) %>% 
+  mutate(abs = abs(coefficient),
+         Sign = if_else(coefficient > 0, '+', '-'),
+         feature = reorder(feature, abs)) %>% 
+  arrange(desc(abs)) %>% 
+  slice(1:30) %>% 
+  arrange(desc(abs)) %>% 
+  ggplot(aes(y = feature, x = abs(coefficient), fill = Sign)) +
+  geom_col() +
+  rcartocolor::scale_fill_carto_d() +
+  labs(x = 'Coefficient', y = NULL) +
+  theme_bw() +
+  theme(legend.position = c(0.8, 0.2))
 
 
 
