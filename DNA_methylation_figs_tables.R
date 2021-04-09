@@ -219,6 +219,8 @@ rf_cv_fig <- rf_cv %>%
         strip.text = element_text(color = 'black'))
 
 
+
+## setup table of best models, CV AUC+/-sd, and validation performance.
 best_logreg <- log_reg_cv %>% 
   filter(mean == max(mean)) %>% 
   transmute(name = "Logistic regression", mean, sd)
@@ -232,13 +234,14 @@ best_rf <- rf_cv %>%
   filter(mean == max(mean)) %>% 
   transmute(name = "Random forest", mean, sd = std_err)
 
-
+# combine best results from each cv
 cv_results <- 
   bind_rows(best_logreg, best_linear_svm,best_rbf_svm, best_rf) %>% 
   transmute(name,
             CV_AUC = paste0(round(mean, 3),' (', round(sd, 3),')')
   )
 
+# 
 validation_results <- 
   tribble(
     ~name,         ~AUC, ~Accuracy, ~Precision, ~Recall, ~F1,
@@ -246,12 +249,12 @@ validation_results <-
     'RBF SVM',             0.936, 0.945, 0.908, 0.912, 0.910,
     'Linear SVM',          0.932, 0.941, 0.895, 0.912, 0.903,
     'Random forest',       0.920, 0.938, 0.916, 0.875, 0.895,
-  )
-
-full_results <- 
-  full_join(cv_results, validation_results, by = 'name') %>% 
+  ) %>% 
+  full_join(cv_results, by = 'name') %>% 
   rename(Classifier = name)
-table1 <- full_results %>% 
+
+write_rds("./results/validation_performance_results.rds")
+final_table <- full_results %>% 
   arrange(desc(AUC)) %>% 
   kableExtra::kable(
     caption = "Performance metrics of best models in validation set prediction."
