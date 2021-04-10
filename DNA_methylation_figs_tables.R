@@ -12,8 +12,7 @@ meth <- meth %>%
     methylated = ifelse(Beta==1, 'methylated', 'unmethylated')
   )
 meth <- meth %>% 
-  mutate(across(everything(),
-                ~ ifelse(is.na(.x), 'None', .x)))
+  mutate(across(everything(), ~ ifelse(is.na(.x), 'None', .x)))
 
 fig1 <- meth %>% 
   group_by(island, methylated) %>% 
@@ -22,28 +21,12 @@ fig1 <- meth %>%
   geom_col() +
   rcartocolor::scale_color_carto_d(palette = 2) +
   rcartocolor::scale_fill_carto_d(palette = 2) +
-  theme_minimal() +
-  theme(legend.position = c(.8, .9)) +
-  labs(subtitle = 'Relation to CpG island',
-       x = '', y ='', color = '', fill = '')
-
-fig2 <- meth %>% 
-  mutate(chromosome = as_factor(chromosome)) %>% 
-  select(-island, -feature) %>% 
-  group_by(chromosome) %>% 
-  mutate(total_sites = n()) %>% 
-  group_by(chromosome, methylated) %>% 
-  mutate(proportion = n()/total_sites) %>% 
-  distinct() %>% 
-  ggplot(aes(chromosome, proportion, fill = methylated)) +
-  geom_col() +
-  rcartocolor::scale_fill_carto_d(palette = 2) +
-  labs(y = 'proportion of sites', fill = '') +
-  theme_minimal() +
-  theme(legend.position = 'none')
+  theme_bw() +
+  theme(legend.position = 'null') +
+  labs(x = '', y ='', color = '', fill = '')
 
 meth <- read_csv("data/train.csv")
-fig3 <- meth %>% 
+fig2 <- meth %>% 
   transmute(
     Id = Id,
     chromosome = CHR,
@@ -60,17 +43,13 @@ fig3 <- meth %>%
   ggplot(aes(y = terms, x = n, fill = methylated)) +
   geom_col() +
   rcartocolor::scale_fill_carto_d(palette = 2) +
-  theme_minimal() +
+  rcartocolor::scale_color_carto_d(palette = 2) +  
+  theme_bw() +
   theme(legend.position = 'null') +
-  labs(subtitle = 'RefGene tags', x = 'n CpG sites', y='', fill ='')
-
-
-panel_A <- ((fig2 + fig3) / (fig1)) + plot_layout(guides = 'auto')
-
+  labs(x = 'n CpG sites', y='', fill ='')
 
 
 # dinucleotide composition graph workflow
-
 meth <- read_csv("./data/train.csv")
 meth <- meth %>% transmute(
   Id, 
@@ -79,7 +58,6 @@ meth <- meth %>% transmute(
   methylated = ifelse(Beta==1, 'methylated', 'unmethylated'),
   island = Relation_to_UCSC_CpG_Island
 )
-
 
 # function generates sequence feature columns [(1-4)-mers] for classification
 generate_kmer_features <- function(df){
@@ -97,7 +75,7 @@ meth_longseq_kmers <- meth %>%
   select(methylated, AA:TT)
 
 # plot distributions of each dinucleotide
-fig4 <- meth_longseq_kmers %>% 
+fig3 <- meth_longseq_kmers %>% 
   pivot_longer(AA:TT, names_to = 'dinucleotide',
                values_to = 'prop') %>% 
   ggplot(aes(x = prop*100, color = methylated, fill = methylated)) +
@@ -105,8 +83,7 @@ fig4 <- meth_longseq_kmers %>%
   facet_wrap(~ dinucleotide) +
   rcartocolor::scale_fill_carto_d(palette = 2) +
   rcartocolor::scale_color_carto_d(palette = 2) +
-  labs(x= '% composition', color ='', fill = '', 
-       subtitle = "DNA composition over 2 kbp around CpG sites") +
+  labs(x= '% composition', color ='', fill = '') +
   theme_minimal() +
   xlim(0, 15) +
   theme(panel.grid = element_blank(), 
@@ -114,9 +91,7 @@ fig4 <- meth_longseq_kmers %>%
         axis.line.y = element_blank())
 
 
-eda1 <- (panel_A | fig4 )
-
-rm(panel_A, fig1, fig2, fig3, fig4)
+eda1 <- ((fig1 / fig2) | fig3) & plot_annotation(tag_levels = 'A')
 
 log_reg_cv <- read_csv("./results/logreg_cv_results.csv") %>% 
   transmute(
@@ -334,7 +309,7 @@ VI_fig <- read_csv("./results/LR_variable_importance.csv") %>%
          Sign = if_else(coefficient > 0, '+', '-'),
          feature = reorder(feature, abs)) %>% 
   arrange(desc(abs)) %>% 
-  slice(1:30) %>% 
+  slice(1:50) %>% 
   arrange(desc(abs)) %>% 
   ggplot(aes(y = feature, x = abs(coefficient), fill = Sign)) +
   geom_col() +
@@ -343,8 +318,10 @@ VI_fig <- read_csv("./results/LR_variable_importance.csv") %>%
   theme_bw() +
   theme(legend.position = c(0.8, 0.2))
 
-
-
+# 
+# read_csv("./results/LR_variable_importance.csv") %>% 
+#   filter(coefficient == 0) %>% 
+#   view()
 
 
 
